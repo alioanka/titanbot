@@ -16,6 +16,7 @@ class StrategyEngine:
         self.timeframe = timeframe
         self.data = data
         self.ml_predictor = PredictMarketDirection()
+        self.strategies = self._load_strategies()  # ✅ Add this line
 
     def _load_strategies(self):
         strategies = []
