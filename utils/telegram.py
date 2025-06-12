@@ -75,14 +75,15 @@ def poll_telegram():
                         send_telegram("No strategy data yet.")
 
                 elif message.strip().lower() == "/status":
-                    from core.state_tracker import load_position_state
+                    from core.state_tracker import StateTracker
                     from core.strategy_engine import StrategyEngine
                     from ml.predictor import PredictMarketDirection
                     import pandas as pd
                     import os
 
                     try:
-                        pos = load_position_state()
+                        print("[📟] /status command received")
+                        pos = StateTracker.load_position_state()
                         if not pos:
                             send_telegram("🟢 No open position.")
                         else:
