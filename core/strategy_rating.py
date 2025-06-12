@@ -1,46 +1,59 @@
-# core/strategy_rating.py
-
 import json
 from collections import defaultdict
 from tabulate import tabulate
 
-LOG_FILE = "strategy_performance.json"
-
-def analyze_strategy_performance():
+def load_strategy_logs(path="strategy_performance.json"):
     try:
-        with open(LOG_FILE, "r") as f:
-            logs = json.load(f)
-    except Exception as e:
-        print(f"[⚠️] Could not read {LOG_FILE}: {e}")
-        return
+        with open(path, "r") as f:
+            return json.load(f)
+    except:
+        return []
 
-    stats = defaultdict(lambda: {"TP_OR_CLOSE": 0, "EMERGENCY": 0, "total": 0, "pnl": 0.0})
+def summarize(logs, ignore_unknown=True):
+    stats = defaultdict(lambda: {"tp": 0, "sl": 0, "total": 0, "pnl": 0.0})
 
     for entry in logs:
-        name = entry["strategy"]
-        result = entry["result"]
-        pnl = float(entry.get("pnl", 0))
-        stats[name]["total"] += 1
-        stats[name][result] += 1
-        stats[name]["pnl"] += pnl
+        strategy = entry.get("strategy", "Unknown")
+        if ignore_unknown and strategy == "Unknown":
+            continue
 
+        result = entry.get("result")
+        pnl = float(entry.get("pnl", 0))
+
+        stats[strategy]["total"] += 1
+        stats[strategy]["pnl"] += pnl
+
+        if result == "TP_OR_CLOSE" and pnl >= 0:
+            stats[strategy]["tp"] += 1
+        elif result == "EMERGENCY" or pnl < 0:
+            stats[strategy]["sl"] += 1
+
+    return stats
+
+def show_summary(stats):
     table = []
     for strategy, data in stats.items():
-        total = data["total"]
-        win_rate = 100 * data["TP_OR_CLOSE"] / total if total else 0
-        avg_pnl = data["pnl"] / total if total else 0
+        win_rate = (data["tp"] / data["total"]) * 100 if data["total"] else 0
+        avg_pnl = data["pnl"] / data["total"] if data["total"] else 0
         table.append([
             strategy,
-            data["TP_OR_CLOSE"],
-            data["EMERGENCY"],
-            total,
+            data["tp"],
+            data["sl"],
+            data["total"],
             f"{win_rate:.1f}%",
             f"{avg_pnl:.2f} USDT"
         ])
 
-    headers = ["Strategy", "Wins (TP)", "Losses (Emergency)", "Total Trades", "Win Rate", "Avg PnL"]
+    table.sort(key=lambda row: float(row[4].replace('%', '')), reverse=True)
+
     print("\n📊 Strategy Performance Leaderboard:\n")
-    print(tabulate(sorted(table, key=lambda x: float(x[-1].split()[0]), reverse=True), headers=headers, tablefmt="fancy_grid"))
+    print(tabulate(
+        table,
+        headers=["Strategy", "Wins (TP)", "Losses (SL)", "Total Trades", "Win Rate", "Avg PnL"],
+        tablefmt="fancy_grid"
+    ))
 
 if __name__ == "__main__":
-    analyze_strategy_performance()
+    logs = load_strategy_logs()
+    summary = summarize(logs)
+    show_summary(summary)
