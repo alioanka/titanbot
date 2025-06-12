@@ -1,6 +1,7 @@
 # core/strategy_engine.py
 
 import importlib
+import random
 import os
 import pandas as pd
 import json
@@ -48,7 +49,9 @@ class StrategyEngine:
             reverse=True
         )
 
-        return sorted_strategies[0] if sorted_strategies else self.strategies[0]
+        return random.choice(self.strategies)
+
+ #       return sorted_strategies[0] if sorted_strategies else self.strategies[0]
 
     def _load_strategy_scores(self):
         try:
@@ -77,6 +80,8 @@ class StrategyEngine:
                 win_rate = stats["tp"] / stats["total"]
                 avg_pnl = stats["pnl"] / stats["total"]
                 scores[strategy] = win_rate * avg_pnl
+
+        print("[DEBUG] Strategy scores:", scores) #remove later
 
         return scores
 
