@@ -73,6 +73,48 @@ def poll_telegram():
                         send_photo("leaderboard.png", caption="📈 Leaderboard Chart")
                     else:
                         send_telegram("No strategy data yet.")
+
+                elif message.strip().lower() == "/status":
+                    from core.state_tracker import load_position_state
+                    from core.strategy_engine import StrategyEngine
+                    from ml.predictor import PredictMarketDirection
+                    import pandas as pd
+                    import os
+
+                    try:
+                        pos = load_position_state()
+                        if not pos:
+                            send_telegram("🟢 No open position.")
+                        else:
+                            df = pd.read_csv("data/BTCUSDT_15m.csv")  # or wherever your main dataset is
+                            predictor = PredictMarketDirection()
+                            strategy = pos.get("strategy", "Unknown")
+                            signal = pos.get("side", "?").upper()
+                            ml = predictor.predict(df)
+
+                            entry = float(pos.get("entry", 0))
+                            last_price = float(df["close"].iloc[-1])
+                            side = signal
+                            qty = float(pos.get("qty", 0))
+                            leverage = int(pos.get("leverage", 0))
+                            pnl = (last_price - entry) * qty if side == "LONG" else (entry - last_price) * qty
+                            pnl_pct = (pnl / (entry * qty)) * 100 if entry and qty else 0
+
+                            msg = (
+                                f"📟 <b>TitanBot Status</b>\n\n"
+                                f"🪙 <b>Symbol:</b> BTCUSDT\n"
+                                f"📊 <b>Strategy:</b> {strategy}\n"
+                                f"💡 <b>Signal:</b> {side}\n"
+                                f"🧠 <b>ML Prediction:</b> {ml}\n"
+                                f"📈 <b>Entry Price:</b> {entry:.2f}\n"
+                                f"📉 <b>Current PnL:</b> {pnl:+.2f} USDT ({pnl_pct:+.2f}%)\n"
+                                f"📌 <b>Leverage:</b> {leverage}x | <b>Size:</b> {qty:.3f} BTC"
+                            )
+                            send_telegram(msg)
+                    except Exception as e:
+                        send_telegram(f"⚠️ Failed to fetch status: {str(e)}")
+
+
             set_last_update_id(last_update)
         except Exception as e:
             print(f"[⚠️] Telegram polling error: {e}")
