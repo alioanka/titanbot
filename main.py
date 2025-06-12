@@ -12,6 +12,8 @@ from core.state_tracker import StateTracker
 from emergency.kill_switch import emergency_exit
 from ml.trainer import train_model
 from utils.telegram import send_telegram
+from utils.telegram import poll_telegram
+import threading
 
 MODEL_PATH = "ml/model_lightgbm.txt"
 
@@ -128,6 +130,20 @@ def run_bot():
         print("[⏳] Sleeping for 60 seconds...\n")
         time.sleep(60)
 
+def refresh_chart_every_12h():
+    import subprocess
+    while True:
+        try:
+            subprocess.run(["python3", "scripts/strategy_chart.py"])
+        except:
+            print("[⚠️] Failed to update leaderboard chart.")
+        time.sleep(43200)  # 12h
+
+
 
 if __name__ == "__main__":
+
+    # Start background threads BEFORE the bot loop
+    threading.Thread(target=poll_telegram, daemon=True).start()
+    threading.Thread(target=refresh_chart_every_12h, daemon=True).start()
     run_bot()
