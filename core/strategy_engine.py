@@ -73,7 +73,7 @@ class StrategyEngine:
         # Score = win rate * avg pnl
         scores = {}
         for strategy, stats in perf.items():
-            if stats["total"] >= 3:  # avoid low-sample noise
+            if stats["total"] >= 0:  # MAKE IT 3 LATERavoid low-sample noise
                 win_rate = stats["tp"] / stats["total"]
                 avg_pnl = stats["pnl"] / stats["total"]
                 scores[strategy] = win_rate * avg_pnl

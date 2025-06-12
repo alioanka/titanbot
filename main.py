@@ -84,7 +84,12 @@ def run_bot():
                 # If PnL is negative, assume SL
                 result_type = "STOP LOSS" if pnl != "Unknown" and pnl < 0 else "TP or Manual"
                 send_telegram(f"✅ <b>Trade Closed ({result_type})</b>\nSymbol: {SYMBOL}")
-                log_strategy_result(strategy_name="Unknown", result="TP_OR_CLOSE", pnl=round(pnl, 2))
+#                log_strategy_result(strategy_name="Unknown", result="TP_OR_CLOSE", pnl=round(pnl, 2))
+                log_strategy_result(
+                    strategy_name=previous_state.get("strategy", "Unknown"),
+                    result="TP_OR_CLOSE",
+                    pnl=round(pnl, 2)
+                )
                 StateTracker.clear_state()
 
             # ✅ Place new order only if no position exists
@@ -103,7 +108,8 @@ def run_bot():
                         "sl": sl,
                         "tp": tp,
                         "leverage": leverage,
-                        "entry": df["close"].iloc[-1]  # or use live entry price
+                        "entry": df["close"].iloc[-1],  # or use live entry price
+                        "strategy": engine._select_best_strategy().name()  # ✅ add this line
                     })
                     send_telegram(f"🚀 <b>New {signal} Position Opened</b>\n"
                                   f"Symbol: {SYMBOL}\nQty: {qty:.4f} @ Leverage {leverage}x\n"
