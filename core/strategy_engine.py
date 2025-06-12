@@ -3,6 +3,8 @@
 import importlib
 import os
 import pandas as pd
+import json
+from collections import defaultdict
 from strategies.base import BaseStrategy
 from ml.predictor import PredictMarketDirection
 
@@ -28,28 +30,53 @@ class StrategyEngine:
         return strategies
 
     def select_strategy_and_generate_signal(self):
-        strategies = self._load_strategies()
-        predictions = self.ml_predictor.predict(self.data)
+        best_strategy = self._select_best_strategy()
+        signal, score = best_strategy.generate_signal()
+        print(f"↪️ {best_strategy.name()} → Signal: {signal} → Score: {score}")
+        return signal
 
-        best_score = -999
-        best_signal = "HOLD"
-        best_strategy = "None"
+    def _select_best_strategy(self):
+        scores = self._load_strategy_scores()
 
-        for strategy in strategies:
-            try:
-                signal = strategy.generate_signal()
-                score = self._score_strategy(signal, predictions)
-                print(f"↪️ {strategy.name()} → Signal: {signal} → Score: {score}")
-                if score > best_score:
-                    best_score = score
-                    best_signal = signal
-                    best_strategy = strategy.name()
-            except Exception as e:
-                print(f"[!] Error in {strategy.name()}: {e}")
-                continue
+        # Sort all loaded strategy instances by performance score (fallback to 0)
+        sorted_strategies = sorted(
+            self.strategies,
+            key=lambda s: scores.get(s.name(), 0),
+            reverse=True
+        )
 
-        print(f"[✓] Selected Strategy: {best_strategy} → Signal: {best_signal}")
-        return best_signal
+        return sorted_strategies[0] if sorted_strategies else self.strategies[0]
+
+    def _load_strategy_scores(self):
+        try:
+            with open("strategy_performance.json", "r") as f:
+                logs = json.load(f)
+        except:
+            return {}
+
+        perf = defaultdict(lambda: {"tp": 0, "emergency": 0, "total": 0, "pnl": 0.0})
+        for entry in logs:
+            name = entry["strategy"]
+            result = entry["result"]
+            pnl = float(entry.get("pnl", 0))
+
+            perf[name]["total"] += 1
+            perf[name]["pnl"] += pnl
+            if result == "TP_OR_CLOSE":
+                perf[name]["tp"] += 1
+            elif result == "EMERGENCY":
+                perf[name]["emergency"] += 1
+
+        # Score = win rate * avg pnl
+        scores = {}
+        for strategy, stats in perf.items():
+            if stats["total"] >= 3:  # avoid low-sample noise
+                win_rate = stats["tp"] / stats["total"]
+                avg_pnl = stats["pnl"] / stats["total"]
+                scores[strategy] = win_rate * avg_pnl
+
+        return scores
+
 
     def _score_strategy(self, signal, predictions):
         """

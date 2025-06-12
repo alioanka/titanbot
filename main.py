@@ -45,6 +45,7 @@ def run_bot():
 
     auto_retrain_model(symbol=SYMBOL, interval=TIMEFRAME)
     client = BinanceFuturesClient()
+    engine = StrategyEngine(symbol=SYMBOL, timeframe=TIMEFRAME, data=df)
 
     while True:
         try:
@@ -89,8 +90,8 @@ def run_bot():
             if current_position:
                 print("[⏳] Open position already exists, skipping new order.")
             else:
-                signal = "LONG"  # or engine.select_strategy_and_generate_signal()
-
+                #signal = "LONG"  # or engine.select_strategy_and_generate_signal()
+                signal = engine.select_strategy_and_generate_signal()
                 if signal in ["LONG", "SHORT"]:
                     qty, leverage, sl, tp = RiskManager.calculate_position(signal, df, balance=1000)
                     client.place_order(SYMBOL, signal, qty, sl, tp, leverage)
