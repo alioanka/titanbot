@@ -45,11 +45,12 @@ def run_bot():
 
     auto_retrain_model(symbol=SYMBOL, interval=TIMEFRAME)
     client = BinanceFuturesClient()
-    engine = StrategyEngine(symbol=SYMBOL, timeframe=TIMEFRAME, data=df)
+    
 
     while True:
         try:
             df = client.get_klines(SYMBOL, TIMEFRAME)
+            engine = StrategyEngine(symbol=SYMBOL, timeframe=TIMEFRAME, data=df)
 
             # ✅ LOAD previous position (to compare against current)
             previous_state = StateTracker.load_position_state()
