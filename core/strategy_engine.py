@@ -32,9 +32,11 @@ class StrategyEngine:
 
     def select_strategy_and_generate_signal(self):
         best_strategy = self._select_best_strategy()
-        signal, score = best_strategy.generate_signal()
+        signal = best_strategy.generate_signal()
+        score = self._score_strategy(signal, self.ml_predictor.predict(self.data))
         print(f"↪️ {best_strategy.name()} → Signal: {signal} → Score: {score}")
         return signal
+
 
     def _select_best_strategy(self):
         scores = self._load_strategy_scores()
