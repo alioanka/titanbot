@@ -96,3 +96,30 @@ class PredictMarketDirection:
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
         rs = gain / loss
         return 100 - (100 / (1 + rs))
+
+
+    def predict_proba(self, df: pd.DataFrame):
+        if self.model is None or df.empty:
+            return None, -1.0
+        df = self._build_features(df.copy())
+        X_latest = df[self.expected_features].dropna().tail(1)
+        if X_latest.empty:
+            return None, -1.0
+        try:
+            probs = self.model.predict(X_latest)[0]
+            return probs, max(probs)
+        except Exception as e:
+            print(f"[⚠️] Prediction error: {e}")
+            return None, -1.0
+
+    def get_signal_from_probs(self, probs):
+        if probs is None:
+            return "HOLD"
+        class_idx = int(np.argmax(probs))
+        return ["SHORT", "HOLD", "LONG"][class_idx]
+
+    def predict(self, df: pd.DataFrame):
+        probs, confidence = self.predict_proba(df)
+        signal = self.get_signal_from_probs(probs)
+        print(f"[🧠] ML Signal: {signal} ({confidence:.2f})")
+        return signal, confidence

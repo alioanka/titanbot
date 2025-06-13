@@ -96,3 +96,50 @@ def train_model(symbol="BTCUSDT", interval="15m"):
     importance = pd.Series(model.feature_importances_, index=X.columns)
     print("[📊] Top Features:")
     print(importance.sort_values(ascending=False))
+
+
+
+def generate_multiclass_labels(df, threshold=0.004, horizon=6):
+    labels = []
+    for i in range(len(df)):
+        if i + horizon >= len(df):
+            labels.append(1)  # HOLD by default at the end
+            continue
+        future_return = (df["close"].iloc[i + horizon] - df["close"].iloc[i]) / df["close"].iloc[i]
+        if future_return > threshold:
+            labels.append(2)  # LONG
+        elif future_return < -threshold:
+            labels.append(0)  # SHORT
+        else:
+            labels.append(1)  # HOLD
+    df["label_class"] = labels
+    return df
+
+
+def train_model(symbol="BTCUSDT", interval="15m", model_path="ml/model_lightgbm.txt"):
+    print(f"[📚] Training LightGBM model for {symbol} on {interval} data")
+
+    df = get_historical_klines(symbol=symbol, interval=interval)
+    df = add_technical_indicators(df)
+    df = generate_multiclass_labels(df)
+
+    df = df.dropna().reset_index(drop=True)
+
+    features = [
+        "return", "volatility", "ema_5", "ema_13", "rsi",
+        "bb_upper", "bb_lower", "bb_width", "macd_hist", "atr", "volume_delta"
+    ]
+    features = [f for f in features if f in df.columns]
+    X = df[features]
+    y = df["label_class"]
+
+    model = lgb.LGBMClassifier(objective="multiclass", num_class=3, n_estimators=100, max_depth=5)
+    model.fit(X, y)
+
+    model.booster_.save_model(model_path)
+    print(f"[✅] Model trained and saved to {model_path}")
+
+    # Print feature importances
+    importance = pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False)
+    print("[📊] Top Features:")
+    print(importance.head(10))

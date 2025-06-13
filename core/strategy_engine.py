@@ -32,11 +32,22 @@ class StrategyEngine:
         return strategies
 
     def select_strategy_and_generate_signal(self):
+        # Step 1: Use ML to get directional signal and confidence
+        ml_signal, confidence = self.ml_predictor.predict(self.data)
+
+        print(f"[ML] Predicted signal: {ml_signal} with confidence {confidence:.2f}")
+        if confidence >= 0.75 and ml_signal in ["LONG", "SHORT"]:
+            print(f"[🧠] ML signal selected: {ml_signal}")
+            return ml_signal
+
+        # Step 2: Fallback to best performing strategy (if ML isn't confident)
         best_strategy = self._select_best_strategy()
-        signal = best_strategy.generate_signal()
-        score = self._score_strategy(signal, self.ml_predictor.predict(self.data))
-        print(f"↪️ {best_strategy.name()} → Signal: {signal} → Score: {score}")
-        return signal
+        if best_strategy:
+            signal, score = best_strategy.generate_signal()
+            print(f"↪️ {best_strategy.name()} → Signal: {signal} → Score: {score}")
+            return signal
+        else:
+            return "HOLD"
 
 
     def _select_best_strategy(self):
