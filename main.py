@@ -3,6 +3,7 @@
 import os
 import time
 import traceback
+import datetime
 from exchange.binance import BinanceFuturesClient
 import requests  # ✅ FIXED
 from config import BASE_URL  # ✅ FIXED
@@ -16,9 +17,26 @@ from utils.telegram import poll_telegram
 import threading
 
 MODEL_PATH = "ml/model_lightgbm.txt"
+RETRAIN_INTERVAL_HOURS = 24
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "15m"
+
+def auto_retrain_loop(symbol, interval):
+    while True:
+        if os.path.exists(MODEL_PATH):
+            mod_time = os.path.getmtime(MODEL_PATH)
+            age_hours = (time.time() - mod_time) / 3600
+            if age_hours > RETRAIN_INTERVAL_HOURS:
+                print(f"[🔄] Last trained {age_hours:.2f}h ago. Retraining...")
+                train_model(symbol, interval)
+            else:
+                print(f"[🧠] Model is fresh ({age_hours:.2f}h ago). Skipping retrain.")
+        else:
+            print("[⚠️] No model found. Training from scratch...")
+            train_model(symbol, interval)
+
+        time.sleep(3600)  # Check once every hour
 
 def auto_retrain_model(symbol="BTCUSDT", interval="5m"):
     retrain_interval_hours = 24
@@ -145,5 +163,6 @@ if __name__ == "__main__":
 
     # Start background threads BEFORE the bot loop
     threading.Thread(target=poll_telegram, daemon=True).start()
+    threading.Thread(target=auto_retrain_loop, args=(SYMBOL, TIMEFRAME), daemon=True).start()
     threading.Thread(target=refresh_chart_every_12h, daemon=True).start()
     run_bot()

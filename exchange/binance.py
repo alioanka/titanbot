@@ -105,4 +105,16 @@ class BinanceFuturesClient:
         except Exception as e:
             print(f"[⚠️] Failed to cancel open orders: {e}")
             return None
+        
+    def get_balance(self):
+        try:
+            response = self._signed_get("/fapi/v2/account")
+            for asset in response.get("assets", []):
+                if asset["asset"] == "USDT":
+                    return float(asset["walletBalance"])
+            return 0.0
+        except Exception as e:
+            print(f"[⚠️] Failed to fetch balance: {e}")
+            return 0.0
+
 
