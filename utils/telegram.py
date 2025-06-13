@@ -71,7 +71,8 @@ def handle_status():
         timestamp = pos.get("timestamp", None)
 
         client = BinanceFuturesClient()
-        price = float(client.get_ticker(symbol)["price"])
+        price = client.get_ticker(symbol)
+
 
         df = client.get_klines(symbol, "15m", limit=150)
         df = pd.DataFrame(df, columns=[
