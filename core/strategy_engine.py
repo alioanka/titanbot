@@ -43,8 +43,8 @@ class StrategyEngine:
         # Step 2: Fallback to best performing strategy (if ML isn't confident)
         best_strategy = self._select_best_strategy()
         if best_strategy:
-            signal, score = best_strategy.generate_signal()
-            print(f"↪️ {best_strategy.name()} → Signal: {signal} → Score: {score}")
+            signal = best_strategy.generate_signal()
+            print(f"↪️ {best_strategy.name()} → Signal: {signal}")
             return signal
         else:
             return "HOLD"
@@ -60,9 +60,9 @@ class StrategyEngine:
             reverse=True
         )
 
-        return random.choice(self.strategies)
+#        return random.choice(self.strategies)
 
- #       return sorted_strategies[0] if sorted_strategies else self.strategies[0]
+        return sorted_strategies[0] if sorted_strategies else self.strategies[0]
 
     def _load_strategy_scores(self):
         try:

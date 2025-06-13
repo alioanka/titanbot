@@ -106,7 +106,7 @@ class PredictMarketDirection:
         if X_latest.empty:
             return None, -1.0
         try:
-            probs = self.model.predict(X_latest)[0]
+            probs = self.model.predict_proba(X_latest)[0]
             return probs, max(probs)
         except Exception as e:
             print(f"[⚠️] Prediction error: {e}")
