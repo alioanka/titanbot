@@ -10,7 +10,7 @@ def load_strategy_logs(path="strategy_performance.json"):
         return []
 
 def summarize(logs, ignore_unknown=True):
-    stats = defaultdict(lambda: {"tp": 0, "sl": 0, "total": 0, "pnl": 0.0})
+    stats = defaultdict(lambda: {"tp": 0, "sl": 0, "total": 0, "pnl": 0.0, "logs": []})
 
     for entry in logs:
         strategy = entry.get("strategy", "Unknown")
@@ -22,6 +22,7 @@ def summarize(logs, ignore_unknown=True):
 
         stats[strategy]["total"] += 1
         stats[strategy]["pnl"] += pnl
+        stats[strategy]["logs"].append(entry)  # ✅ Append full log entry for summary
 
         if result == "TP_OR_CLOSE" and pnl >= 0:
             stats[strategy]["tp"] += 1
@@ -29,6 +30,7 @@ def summarize(logs, ignore_unknown=True):
             stats[strategy]["sl"] += 1
 
     return stats
+
 
 def show_summary(stats):
     table = []
