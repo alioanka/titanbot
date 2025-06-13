@@ -124,5 +124,14 @@ class BinanceFuturesClient:
             print(f"[⚠️] Failed to fetch balance: {e}")
             return 0.0
 
+    def get_ticker(self, symbol):
+        try:
+            endpoint = "/fapi/v1/ticker/price"
+            params = {"symbol": symbol.upper()}
+            response = self._signed_get(endpoint, params=params)
+            return float(response["price"])
+        except Exception as e:
+            print(f"[⚠️] Failed to fetch ticker for {symbol}: {e}")
+            return None
 
 
