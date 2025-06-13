@@ -108,13 +108,21 @@ class BinanceFuturesClient:
         
     def get_balance(self):
         try:
-            response = self._signed_get("/fapi/v2/account")
-            for asset in response.get("assets", []):
+            params = {
+                "timestamp": int(time.time() * 1000)
+            }
+            query = urlencode(params)
+            signature = hmac.new(BINANCE_API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+            url = f"{BASE_URL}/fapi/v2/account?{query}&signature={signature}"
+            res = self.session.get(url)
+            data = res.json()
+            for asset in data.get("assets", []):
                 if asset["asset"] == "USDT":
                     return float(asset["walletBalance"])
             return 0.0
         except Exception as e:
             print(f"[⚠️] Failed to fetch balance: {e}")
             return 0.0
+
 
 

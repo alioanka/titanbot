@@ -143,7 +143,13 @@ def handle_summary():
         for s, data in stats.items():
             for log in data.get("logs", []):
                 ts = log["timestamp"]
-                dt = datetime.datetime.fromtimestamp(ts)
+                if not ts:
+                    continue
+                try:
+                    # ✅ Handle ISO string timestamps properly
+                    dt = datetime.datetime.fromisoformat(ts)
+                except:
+                    continue
                 if dt.strftime("%Y-%m-%d") == today:
                     total_pnl_today += log["pnl"]
                 if dt.strftime("%Y-W%U") == week:
