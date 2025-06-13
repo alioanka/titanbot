@@ -18,10 +18,13 @@ class PredictMarketDirection:
         if os.path.exists(self.model_path):
             model = lgb.LGBMClassifier()
             model._Booster = lgb.Booster(model_file=self.model_path)
+            model._fit_called = True           # ✅ Prevents "Estimator not fitted" error
+            model.fitted_ = True               # ✅ Optional but safe for newer versions
             return model
         else:
             print("[!] LightGBM model not found. Using fallback prediction.")
             return None
+
 
     def _build_features(self, df: pd.DataFrame):
         df["return"] = df["close"].pct_change()
