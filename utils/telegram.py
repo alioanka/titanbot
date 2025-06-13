@@ -175,9 +175,123 @@ def auto_daily_journal():
             print(f"[⚠️] Auto journal error: {e}")
         time.sleep(86400)  # once per 24h
 
+def handle_weekly():
+    from core.strategy_rating import summarize, load_strategy_logs
+    stats = summarize(load_strategy_logs())
+    week = datetime.datetime.now().strftime("%Y-W%U")
+    total = 0.0
+    msg = f"📅 <b>Weekly Strategy Report ({week})</b>\n\n"
+    for strategy, data in stats.items():
+        win_rate = (data["tp"] / data["total"]) * 100 if data["total"] else 0
+        msg += (
+            f"📌 <b>{strategy}</b>\n"
+            f"✔️ TP: {data['tp']} | ❌ SL: {data['sl']} | ⚖️ {win_rate:.1f}% | 💰 {data['pnl']:.2f} USDT\n\n"
+        )
+        for log in data.get("logs", []):
+            try:
+                dt = datetime.datetime.fromisoformat(log["timestamp"])
+                if dt.strftime("%Y-W%U") == week:
+                    total += log["pnl"]
+            except:
+                continue
+    msg += f"📈 Total Weekly PnL: {total:.2f} USDT"
+    send_telegram(msg)
+
+def handle_journal():
+    from core.strategy_rating import summarize, load_strategy_logs
+    stats = summarize(load_strategy_logs())
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    logs = []
+    msg = f"📔 <b>Trade Journal ({today})</b>\n\n"
+    for strategy, data in stats.items():
+        for log in data.get("logs", []):
+            try:
+                dt = datetime.datetime.fromisoformat(log["timestamp"])
+                if dt.strftime("%Y-%m-%d") == today:
+                    result = "✅ TP" if log["pnl"] >= 0 else "❌ SL"
+                    msg += f"{result} | {strategy} | {log['pnl']:+.2f} USDT\n"
+                    logs.append(log)
+            except:
+                continue
+    if not logs:
+        msg += "No trades today."
+    send_telegram(msg)
+    if logs:
+        df = pd.DataFrame(logs)
+        df.to_csv("journal.csv", index=False)
+        send_document("journal.csv", caption="📎 Today's Journal")
+
+def handle_monthly():
+    from core.strategy_rating import load_strategy_logs
+    logs = load_strategy_logs()
+    now = datetime.datetime.now()
+    current_month = now.strftime("%Y-%m")
+    pnl = 0.0
+    count = 0
+    for log in logs:
+        try:
+            dt = datetime.datetime.fromisoformat(log["timestamp"])
+            if dt.strftime("%Y-%m") == current_month:
+                pnl += log["pnl"]
+                count += 1
+        except:
+            continue
+    msg = (
+        f"📆 <b>Monthly Summary ({current_month})</b>\n\n"
+        f"🧾 Trades: {count}\n"
+        f"💰 Total PnL: {pnl:.2f} USDT"
+    )
+    send_telegram(msg)
+
+def handle_lifetime():
+    from core.strategy_rating import load_strategy_logs
+    logs = load_strategy_logs()
+    pnl = sum(log.get("pnl", 0) for log in logs)
+    count = len(logs)
+    msg = (
+        f"🌍 <b>Lifetime Stats</b>\n\n"
+        f"🧾 Trades: {count}\n"
+        f"💰 Total PnL: {pnl:.2f} USDT"
+    )
+    send_telegram(msg)
+
+def send_command_list():
+    send_telegram(
+        "🤖 <b>TitanBotv2 Online</b>\n\n"
+        "Available commands:\n"
+        "/status – View current trade status\n"
+        "/rating – Strategy leaderboard\n"
+        "/summary – Daily/weekly PnL + balance\n"
+        "/weekly – Weekly performance per strategy\n"
+        "/journal – Today's trade log (CSV)\n"
+        "/monthly – This month's total PnL\n"
+        "/lifetime – All-time performance\n"
+        "/cancel – Emergency order cancel"
+    )
+
+def send_document(file_path, caption=None):
+    url = f"{BASE_URL}/sendDocument"
+    try:
+        with open(file_path, "rb") as doc:
+            payload = {
+                "chat_id": TELEGRAM_CHAT_ID,
+                "caption": caption or "Document"
+            }
+            files = {"document": doc}
+            res = requests.post(url, data=payload, files=files)
+            if res.status_code != 200:
+                print(f"[⚠️] Telegram file error: {res.text}")
+    except Exception as e:
+        print(f"[⚠️] Telegram file exception: {e}")
+
+
 def poll_telegram():
     print("[🔄] Telegram polling started...")
     last_update = get_last_update_id()
+
+    # Send full command list on bot startup
+    send_command_list()
+
     while True:
         try:
             res = requests.get(f"{BASE_URL}/getUpdates", params={"offset": last_update + 1})
@@ -199,20 +313,28 @@ def poll_telegram():
                         send_photo("leaderboard.png", caption="🖼 📈 Leaderboard Chart")
                     else:
                         send_telegram("No strategy data yet.")
-
                 elif message == "/status":
                     handle_status()
-
                 elif message == "/cancel":
                     handle_cancel()
-
                 elif message == "/summary":
                     handle_summary()
+                elif message == "/weekly":
+                    handle_weekly()
+                elif message == "/journal":
+                    handle_journal()
+                elif message == "/monthly":
+                    handle_monthly()
+                elif message == "/lifetime":
+                    handle_lifetime()
+                elif message == "/help":
+                    send_command_list()
 
             set_last_update_id(last_update)
         except Exception as e:
             print(f"[⚠️] Telegram polling error: {e}")
         time.sleep(5)
+
 
 # Start auto daily journaling in background
 threading.Thread(target=auto_daily_journal, daemon=True).start()
