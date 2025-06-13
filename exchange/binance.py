@@ -126,13 +126,14 @@ class BinanceFuturesClient:
 
     def get_ticker(self, symbol):
         try:
-            endpoint = "/fapi/v1/ticker/price"
+            url = f"{BASE_URL}/fapi/v1/ticker/price"
             params = {"symbol": symbol.upper()}
-            response = self._http_get(endpoint, params)
+            response = requests.get(url, params=params).json()
             return float(response["price"])
         except Exception as e:
             print(f"[⚠️] Failed to fetch ticker for {symbol}: {e}")
             return 0.0
+
 
 
 
