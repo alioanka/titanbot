@@ -16,7 +16,9 @@ class PredictMarketDirection:
 
     def _load_model(self):
         if os.path.exists(self.model_path):
-            return lgb.Booster(model_file=self.model_path)
+            model = lgb.LGBMClassifier()
+            model._Booster = lgb.Booster(model_file=self.model_path)
+            return model
         else:
             print("[!] LightGBM model not found. Using fallback prediction.")
             return None
