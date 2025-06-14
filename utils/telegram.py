@@ -85,7 +85,13 @@ def handle_status():
         predictor = PredictMarketDirection()
         ml = predictor.predict(df)
         proba = predictor.predict_proba(df)
-        confidence = max(proba) * 100 if proba is not None else 0
+        print(f"[DEBUG] predict_proba returned: {proba}")
+
+        #confidence = max(proba) * 100 if proba is not None else 0
+        try:
+            confidence = max(proba) * 100
+        except:
+            confidence = proba * 100 if isinstance(proba, (int, float)) else 0
 
         pnl = (price - entry) * qty if side == "LONG" else (entry - price) * qty
         pnl_pct = (pnl / (entry * qty)) * 100 if entry and qty else 0
