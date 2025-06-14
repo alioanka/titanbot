@@ -62,7 +62,12 @@ class StrategyEngine:
 
 #        return random.choice(self.strategies)
 
-        return sorted_strategies[0] if sorted_strategies else self.strategies[0]
+        if len(scores) < 10:
+            print("[🧪] Strategy sample size small — using random strategy.")
+            return random.choice(self.strategies)
+        else:
+            return sorted_strategies[0] if sorted_strategies else self.strategies[0]
+
 
     def _load_strategy_scores(self):
         try:

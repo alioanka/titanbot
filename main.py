@@ -22,6 +22,12 @@ RETRAIN_INTERVAL_HOURS = 24
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "15m"
 
+last_trade_close_time = 0
+last_trade_result = None
+cooldown_tp = 3 * 60   # 3 minutes
+cooldown_sl = 6 * 60   # 6 minutes
+
+
 def auto_retrain_loop(symbol, interval):
     while True:
         if os.path.exists(MODEL_PATH):
@@ -103,6 +109,10 @@ def run_bot():
 
                 # If PnL is negative, assume SL
                 result_type = "STOP LOSS" if pnl != "Unknown" and pnl < 0 else "TP or Manual"
+                global last_trade_close_time, last_trade_result
+                last_trade_close_time = time.time()
+                last_trade_result = "SL" if result_type == "STOP LOSS" else "TP"
+
                 send_telegram(f"✅ <b>Trade Closed ({result_type})</b>\nSymbol: {SYMBOL}")
 #                log_strategy_result(strategy_name="Unknown", result="TP_OR_CLOSE", pnl=round(pnl, 2))
                 log_strategy_result(
@@ -118,6 +128,17 @@ def run_bot():
             else:
                 #signal = "LONG"  # or engine.select_strategy_and_generate_signal()
                 signal = engine.select_strategy_and_generate_signal()
+
+
+                if last_trade_result == "TP" and (time.time() - last_trade_close_time) < cooldown_tp:
+                    print("⏳ TP cooldown active. Skipping entry.")
+                    continue
+
+                if last_trade_result == "SL" and (time.time() - last_trade_close_time) < cooldown_sl:
+                    print("⏳ SL cooldown active. Skipping entry.")
+                    continue
+
+
                 if signal in ["LONG", "SHORT"]:
                     qty, leverage, sl, tp = RiskManager.calculate_position(signal, df, balance=1000)
                     client.place_order(SYMBOL, signal, qty, sl, tp, leverage)
