@@ -6,3 +6,4 @@ pandas
 numpy
 tabulate
 requests
+ta

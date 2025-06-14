@@ -55,48 +55,14 @@ def build_features_and_labels(df):
 
     features = df[[
         "return", "volatility", "ema_5", "ema_13", "rsi",
-        "bb_width", "macd_hist", "atr", "volume_delta"
+        "bb_upper", "bb_lower", "bb_width",
+        "macd_hist", "atr", "volume_delta"
     ]]
     labels = df["label"]
 
     # Safety check for NaNs
     mask = ~features.isna().any(axis=1) & ~labels.isna()
     return features[mask], labels[mask]
-
-def train_model(symbol="BTCUSDT", interval="15m"):
-    print(f"[📚] Training LightGBM model for {symbol} on {interval} data")
-    df = get_historical_klines(symbol, interval, lookback_days=180)
-    X, y = build_features_and_labels(df)
-
-    if X.empty or y.empty:
-        print("[❌] Not enough clean data to train. Skipping model training.")
-        return
-
-    print("[ℹ️] Training samples:", len(X))
-
-    params = {
-        "objective": "binary",
-        "boosting_type": "gbdt",
-        "learning_rate": 0.01,
-        "num_leaves": 31,
-        "max_depth": -1,
-        "n_estimators": 500,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "random_state": 42,
-    }
-
-    model = lgb.LGBMClassifier(**params)
-    model.fit(X, y)
-
-    model.booster_.save_model("ml/model_lightgbm.txt")
-    print("[✅] Model trained and saved to ml/model_lightgbm.txt")
-
-    # Optional: feature importance
-    importance = pd.Series(model.feature_importances_, index=X.columns)
-    print("[📊] Top Features:")
-    print(importance.sort_values(ascending=False))
-
 
 
 def generate_multiclass_labels(df, threshold=0.004, horizon=6):
