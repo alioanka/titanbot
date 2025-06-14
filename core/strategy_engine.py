@@ -34,13 +34,50 @@ class StrategyEngine:
     def select_strategy_and_generate_signal(self):
         # Step 1: Use ML to get directional signal and confidence
         ml_signal, confidence = self.ml_predictor.predict(self.data)
-
         print(f"[ML] Predicted signal: {ml_signal} with confidence {confidence:.2f}")
+
         if confidence >= 0.75 and ml_signal in ["LONG", "SHORT"]:
             print(f"[🧠] ML signal selected: {ml_signal}")
             return ml_signal
 
-        # Step 2: Fallback to best performing strategy (if ML isn't confident)
+        # Step 2: Use Phase 12 ML strategy selector if available
+        try:
+            from ml.selector_predictor import StrategySelector
+            selector = StrategySelector(
+                model_path="ml/model_strategy_selector.txt",
+                encoder_path="ml/strategy_encoder.pkl"
+            )
+
+            # Build feature snapshot for each strategy
+            rows = []
+            for s in self.strategies:
+                row = {
+                    "rsi": self.data["rsi"].iloc[-1],
+                    "atr": self.data["atr"].iloc[-1],
+                    "ma_trend": (self.data["close"].iloc[-1] - self.data["close"].iloc[-10]) / self.data["close"].iloc[-10],
+                    "volume_ratio": self.data["volume"].iloc[-1] / self.data["volume"].rolling(10).mean().iloc[-1],
+                    "body_ratio": abs(self.data["close"].iloc[-1] - self.data["open"].iloc[-1]) / (self.data["high"].iloc[-1] - self.data["low"].iloc[-1] + 1e-9),
+                    "strategy": s.name()
+                }
+                rows.append(row)
+
+            df = pd.DataFrame(rows)
+
+            # Load encoder
+            import joblib
+            encoder = joblib.load("ml/strategy_encoder.pkl")
+            df["strategy_encoded"] = encoder.transform(df["strategy"])
+
+            best_strategy_name, prob = selector.predict_best_strategy(df)
+            best_strategy = next((s for s in self.strategies if s.name() == best_strategy_name), None)
+            if best_strategy:
+                signal = best_strategy.generate_signal()
+                print(f"[🤖] Selector picked: {best_strategy.name()} → Signal: {signal} (Prob: {prob:.2f})")
+                return signal
+        except Exception as e:
+            print(f"[⚠️] Phase 12 strategy selector failed: {e}")
+
+        # Step 3: Fallback to best performing strategy
         best_strategy = self._select_best_strategy()
         if best_strategy:
             signal = best_strategy.generate_signal()
@@ -48,6 +85,7 @@ class StrategyEngine:
             return signal
         else:
             return "HOLD"
+
 
 
     def _select_best_strategy(self):
