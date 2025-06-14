@@ -49,6 +49,10 @@ class StrategyEngine:
             )
 
             # Build feature snapshot for each strategy
+            required = ["rsi", "atr", "close", "open", "high", "low", "volume"]
+            if not all(col in self.data.columns for col in required):
+                raise ValueError(f"Missing required indicators in data: {self.data.columns.tolist()}")
+
             rows = []
             for s in self.strategies:
                 row = {
