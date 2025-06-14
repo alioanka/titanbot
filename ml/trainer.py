@@ -64,7 +64,6 @@ def build_features_and_labels(df):
     mask = ~features.isna().any(axis=1) & ~labels.isna()
     return features[mask], labels[mask]
 
-
 def generate_multiclass_labels(df, threshold=0.004, horizon=6):
     labels = []
     for i in range(len(df)):
@@ -81,6 +80,7 @@ def generate_multiclass_labels(df, threshold=0.004, horizon=6):
     df["label_class"] = labels
     return df
 
+#test
 
 def train_model(symbol="BTCUSDT", interval="15m", model_path="ml/model_lightgbm.txt"):
     print(f"[📚] Training LightGBM model for {symbol} on {interval} data")

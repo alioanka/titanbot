@@ -63,7 +63,7 @@ class PredictMarketDirection:
         features = df[self.expected_features].copy()
         return features
 
-
+#testtt
 
 
     def predict_proba(self, df: pd.DataFrame):
