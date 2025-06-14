@@ -48,10 +48,18 @@ class StrategyEngine:
                 encoder_path="ml/strategy_encoder.pkl"
             )
 
-            # Build feature snapshot for each strategy
-            required = ["rsi", "atr", "close", "open", "high", "low", "volume"]
-            if not all(col in self.data.columns for col in required):
-                raise ValueError(f"Missing required indicators in data: {self.data.columns.tolist()}")
+            # Defensive check — patch missing raw OHLCV columns
+            ohlc_keys = ["open", "high", "low", "close", "volume"]
+            if not all(k in self.data.columns for k in ohlc_keys):
+                try:
+                    from exchange.binance import BinanceFuturesClient
+                    client = BinanceFuturesClient()
+                    klines = client.fetch_ohlcv(self.symbol, self.timeframe, limit=20)
+                    ohlcv_df = pd.DataFrame(klines, columns=["timestamp", "open", "high", "low", "close", "volume"])
+                    for col in ohlc_keys:
+                        self.data[col] = ohlcv_df[col].astype(float)
+                except Exception as err:
+                    raise ValueError(f"Missing required indicators in data: {self.data.columns.tolist()}")
 
             rows = []
             for s in self.strategies:
@@ -67,7 +75,6 @@ class StrategyEngine:
 
             df = pd.DataFrame(rows)
 
-            # Load encoder
             import joblib
             encoder = joblib.load("ml/strategy_encoder.pkl")
             df["strategy_encoded"] = encoder.transform(df["strategy"])
@@ -89,6 +96,7 @@ class StrategyEngine:
             return signal
         else:
             return "HOLD"
+
 
 
 
