@@ -176,9 +176,11 @@ def run_bot():
                                 break
                     print(f"[✅] Final SL/TP values after Phase 14 logic:")
                     print(f"     ➤ Signal: {signal}")
-                    print(f"     ➤ ML Confidence: {ml_conf}")
-                    print(f"     ➤ Market Zone: {zone}")
+                    print(f"     ➤ ML Confidence: {ml_conf if ml_conf is not None else 'N/A'}")
+                    print(f"     ➤ Market Zone: {zone if zone is not None else 'N/A'}")
                     print(f"     ➤ SL: {sl:.2f} | TP: {tp:.2f}")
+
+
 
 
                     client.place_order(SYMBOL, signal, qty, sl, tp, leverage)
