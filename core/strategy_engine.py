@@ -67,6 +67,19 @@ class StrategyEngine:
 
                 self.data["volume_delta"] = self.data["volume"] * self.data["close"].diff()
 
+            # Phase 13: Determine market context zone (Bullish, Bearish, Sideways)
+            zone = "Sideways"
+            try:
+                trend = (self.data["close"].iloc[-1] - self.data["close"].iloc[-20]) / self.data["close"].iloc[-20]
+                if trend > 0.015:
+                    zone = "Bullish"
+                elif trend < -0.015:
+                    zone = "Bearish"
+                print(f"[🌐] Market zone: {zone}")
+            except Exception as e:
+                print(f"[⚠️] Trend zone detection failed: {e}")
+
+            # Load Phase 12 ML model
             from ml.selector_predictor import StrategySelector
             selector = StrategySelector(
                 model_path="ml/model_strategy_selector.txt",
@@ -94,7 +107,8 @@ class StrategyEngine:
                     "ma_trend": (self.data["close"].iloc[-1] - self.data["close"].iloc[-10]) / self.data["close"].iloc[-10],
                     "volume_ratio": self.data["volume"].iloc[-1] / self.data["volume"].rolling(10).mean().iloc[-1],
                     "body_ratio": abs(self.data["close"].iloc[-1] - self.data["open"].iloc[-1]) / (self.data["high"].iloc[-1] - self.data["low"].iloc[-1] + 1e-9),
-                    "strategy": s.name()
+                    "strategy": s.name(),
+                    "zone": zone  # ⬅️ NEW FEATURE for Phase 13
                 }
                 rows.append(row)
 
@@ -111,7 +125,7 @@ class StrategyEngine:
                 print(f"[🤖] Selector picked: {best_strategy.name()} → Signal: {signal} (Prob: {prob:.2f})")
                 return signal
         except Exception as e:
-            print(f"[⚠️] Phase 12 strategy selector failed: {e}")
+            print(f"[⚠️] Phase 12/13 strategy selector failed: {e}")
 
         # Step 3: Fallback to best performing strategy
         best_strategy = self._select_best_strategy()
@@ -121,6 +135,7 @@ class StrategyEngine:
             return signal
         else:
             return "HOLD"
+
 
 
 
