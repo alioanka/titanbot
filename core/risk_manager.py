@@ -13,9 +13,30 @@ class RiskManager:
     FALLBACK_TP_PCT = 0.006 #0.02
 
     @staticmethod
-    def calculate_position(signal: str, df: pd.DataFrame, balance: float = 1000):
+    def calculate_position(signal: str, df: pd.DataFrame, balance: float = 1000, zone: str = None, confidence: float = 1.0):
         close_price = df["close"].iloc[-1]
         atr = RiskManager._calculate_atr(df)
+
+        # Default multipliers
+        sl_mult = RiskManager.SL_ATR_MULTIPLIER
+        tp_mult = RiskManager.TP_ATR_MULTIPLIER
+
+        # 🔁 Adjust based on zone if available (Phase 13)
+        if zone:
+            if zone == "Bullish":
+                sl_mult *= 0.9
+                tp_mult *= 1.2
+            elif zone == "Bearish":
+                sl_mult *= 1.2
+                tp_mult *= 0.9
+            elif zone == "Sideways":
+                sl_mult *= 0.8
+                tp_mult *= 0.8
+
+        # 📉 Adjust further if ML confidence is weak
+        if confidence < 0.8:
+            sl_mult *= 0.9
+            tp_mult *= 0.9
 
         if atr is None or np.isnan(atr):
             sl_pct = RiskManager.FALLBACK_SL_PCT
@@ -23,19 +44,20 @@ class RiskManager:
             sl_price = close_price * (1 - sl_pct) if signal == "LONG" else close_price * (1 + sl_pct)
             tp_price = close_price * (1 + tp_pct) if signal == "LONG" else close_price * (1 - tp_pct)
         else:
-            sl_price = close_price - atr * RiskManager.SL_ATR_MULTIPLIER if signal == "LONG" else close_price + atr * RiskManager.SL_ATR_MULTIPLIER
-            tp_price = close_price + atr * RiskManager.TP_ATR_MULTIPLIER if signal == "LONG" else close_price - atr * RiskManager.TP_ATR_MULTIPLIER
+            sl_price = close_price - atr * sl_mult if signal == "LONG" else close_price + atr * sl_mult
+            tp_price = close_price + atr * tp_mult if signal == "LONG" else close_price - atr * tp_mult
 
         stop_loss_distance = abs(close_price - sl_price)
         risk_amount = balance * RiskManager.MAX_RISK_PCT
         qty = risk_amount / stop_loss_distance
 
-        # Add leverage logic based on volatility
+        # ⚙️ Leverage adjustment based on volatility
         volatility = df["close"].pct_change().rolling(10).std().iloc[-1]
         leverage = min(RiskManager.MAX_LEVERAGE, max(1, int(RiskManager.DEFAULT_LEVERAGE / (volatility * 100 + 1))))
 
         print(f"[💡] RiskManager decision → Qty: {qty:.4f}, Leverage: {leverage}, SL: {sl_price:.2f}, TP: {tp_price:.2f}")
         return qty, leverage, sl_price, tp_price
+
 
     @staticmethod
     def _calculate_atr(df: pd.DataFrame, period: int = 14):

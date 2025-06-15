@@ -27,6 +27,19 @@ last_trade_result = None
 cooldown_tp = 3 * 60   # 3 minutes
 cooldown_sl = 6 * 60   # 6 minutes
 
+# NEW: Adaptive SL/TP multipliers
+zone_sl_tp_multipliers = {
+    "Bullish": (0.9, 1.2),     # (SL, TP)
+    "Bearish": (1.1, 1.1),
+    "Sideways": (0.8, 0.8)
+}
+confidence_sl_tp_multipliers = [
+    (0.99, (1.0, 1.0)),
+    (0.95, (0.9, 0.9)),
+    (0.90, (0.85, 0.85)),
+    (0.80, (0.75, 0.75)),
+]
+
 
 def auto_retrain_loop(symbol, interval):
     while True:
@@ -141,6 +154,28 @@ def run_bot():
 
                 if signal in ["LONG", "SHORT"]:
                     qty, leverage, sl, tp = RiskManager.calculate_position(signal, df, balance=1000)
+
+                    # 🧠 Get ML confidence and zone from engine (if available)
+                    ml_conf = getattr(engine, "last_ml_confidence", None)
+                    zone = getattr(engine, "last_market_zone", None)
+
+                    # Apply zone-based SL/TP tuning
+                    if zone in zone_sl_tp_multipliers:
+                        sl_mul, tp_mul = zone_sl_tp_multipliers[zone]
+                        sl *= sl_mul
+                        tp *= tp_mul
+                        print(f"[⚙️] Zone-based multipliers applied: SL x{sl_mul}, TP x{tp_mul}")
+
+                    # Apply confidence-based tuning
+                    if isinstance(ml_conf, float):
+                        for threshold, (sl_mul, tp_mul) in confidence_sl_tp_multipliers:
+                            if ml_conf >= threshold:
+                                sl *= sl_mul
+                                tp *= tp_mul
+                                print(f"[📐] Confidence-based multipliers applied: SL x{sl_mul}, TP x{tp_mul} for conf {ml_conf}")
+                                break
+
+
                     client.place_order(SYMBOL, signal, qty, sl, tp, leverage)
                     StateTracker.save_position_state({
                         "symbol": SYMBOL,
