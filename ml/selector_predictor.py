@@ -19,7 +19,7 @@ class StrategySelector:
                 "Sideways": 0,
                 "Bullish": 1,
                 "Bearish": -1
-            }).astype(int)
+            }).astype(int, copy=False)
 
         # Prepare inputs
         model_features = ["rsi", "atr", "ma_trend", "volume_ratio", "body_ratio", "zone", "strategy_encoded"]
