@@ -174,6 +174,11 @@ def run_bot():
                                 tp *= tp_mul
                                 print(f"[📐] Confidence-based multipliers applied: SL x{sl_mul}, TP x{tp_mul} for conf {ml_conf}")
                                 break
+                    print(f"[✅] Final SL/TP values after Phase 14 logic:")
+                    print(f"     ➤ Signal: {signal}")
+                    print(f"     ➤ ML Confidence: {ml_conf}")
+                    print(f"     ➤ Market Zone: {zone}")
+                    print(f"     ➤ SL: {sl:.2f} | TP: {tp:.2f}")
 
 
                     client.place_order(SYMBOL, signal, qty, sl, tp, leverage)
