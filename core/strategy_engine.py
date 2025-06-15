@@ -36,7 +36,7 @@ class StrategyEngine:
         ml_signal, confidence = self.ml_predictor.predict(self.data)
         print(f"[ML] Predicted signal: {ml_signal} with confidence {confidence:.2f}")
 
-        if confidence >= 0.75 and ml_signal in ["LONG", "SHORT"]:
+        if confidence >= 0.99 and ml_signal in ["LONG", "SHORT"]:
             print(f"[🧠] ML signal selected: {ml_signal}")
             return ml_signal
 
