@@ -42,6 +42,31 @@ class StrategyEngine:
 
         # Step 2: Use Phase 12 ML strategy selector if available
         try:
+            # Defensive patch for indicator columns (rsi, atr, etc.)
+            if "rsi" not in self.data.columns or self.data["rsi"].isna().all():
+                self.data["return"] = self.data["close"].pct_change()
+                self.data["volatility"] = self.data["return"].rolling(10).std()
+                self.data["ema_5"] = self.data["close"].ewm(span=5).mean()
+                self.data["ema_13"] = self.data["close"].ewm(span=13).mean()
+
+                delta = self.data["close"].diff()
+                gain = delta.where(delta > 0, 0).rolling(14).mean()
+                loss = -delta.where(delta < 0, 0).rolling(14).mean()
+                rs = gain / loss
+                self.data["rsi"] = 100 - (100 / (1 + rs))
+
+                self.data["macd"] = self.data["close"].ewm(span=12).mean() - self.data["close"].ewm(span=26).mean()
+                self.data["macd_signal"] = self.data["macd"].ewm(span=9).mean()
+                self.data["macd_hist"] = self.data["macd"] - self.data["macd_signal"]
+
+                tr1 = self.data["high"] - self.data["low"]
+                tr2 = abs(self.data["high"] - self.data["close"].shift())
+                tr3 = abs(self.data["low"] - self.data["close"].shift())
+                tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+                self.data["atr"] = tr.rolling(14).mean()
+
+                self.data["volume_delta"] = self.data["volume"] * self.data["close"].diff()
+
             from ml.selector_predictor import StrategySelector
             selector = StrategySelector(
                 model_path="ml/model_strategy_selector.txt",

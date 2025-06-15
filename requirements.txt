@@ -1,9 +1,22 @@
+# Core
 ccxt
 python-binance
-lightgbm
-scikit-learn
 pandas
 numpy
-tabulate
 requests
 ta
+tabulate
+
+# ML
+scikit-learn
+lightgbm
+joblib
+
+# Visualization
+matplotlib
+
+# Telegram Bot
+python-telegram-bot==13.15
+
+# Time & JSON handling
+python-dateutil
