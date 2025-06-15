@@ -1,4 +1,3 @@
-
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
@@ -19,6 +18,17 @@ eth_df["ma14"] = eth_df["close"].rolling(14).mean()
 eth_df["ma_trend"] = eth_df["ma14"].pct_change(periods=5)
 eth_df["volume_ratio"] = eth_df["volume"] / eth_df["volume"].rolling(14).mean()
 eth_df["body_ratio"] = abs(eth_df["close"] - eth_df["open"]) / (eth_df["high"] - eth_df["low"] + 1e-6)
+
+# Add zone feature (numeric encoding)
+def compute_zone(row):
+    if abs(row["ma_trend"]) < 0.001:
+        return 0  # Sideways
+    elif row["ma_trend"] > 0:
+        return 1  # Bullish
+    else:
+        return -1  # Bearish
+
+eth_df["zone"] = eth_df.apply(compute_zone, axis=1)
 eth_df.dropna(inplace=True)
 eth_df.reset_index(inplace=True)
 
@@ -42,7 +52,7 @@ le = LabelEncoder()
 merged["strategy_encoded"] = le.fit_transform(merged["strategy"])
 
 # Prepare training data
-features = ["rsi", "atr", "ma_trend", "volume_ratio", "body_ratio", "strategy_encoded"]
+features = ["rsi", "atr", "ma_trend", "volume_ratio", "body_ratio", "zone", "strategy_encoded"]
 X = merged[features]
 y = merged["target"]
 
