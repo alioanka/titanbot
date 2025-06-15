@@ -1,6 +1,9 @@
 import pandas as pd
 import joblib
 import lightgbm as lgb
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*Downcasting behavior in `replace`.*")
+
 
 class StrategySelector:
     def __init__(self, model_path="ml/model_strategy_selector.txt", encoder_path="ml/strategy_encoder.pkl"):
@@ -19,7 +22,7 @@ class StrategySelector:
                 "Sideways": 0,
                 "Bullish": 1,
                 "Bearish": -1
-            }).astype("int64")
+            }).astype("int64", copy=False)
 
         # Prepare inputs
         model_features = ["rsi", "atr", "ma_trend", "volume_ratio", "body_ratio", "zone", "strategy_encoded"]
