@@ -153,11 +153,15 @@ def run_bot():
 
 
                 if signal in ["LONG", "SHORT"]:
-                    qty, leverage, sl, tp = RiskManager.calculate_position(signal, df, balance=1000)
-
                     # 🧠 Get ML confidence and zone from engine (if available)
                     ml_conf = getattr(engine, "last_ml_confidence", None)
                     zone = getattr(engine, "last_market_zone", None)
+
+                    qty, leverage, sl, tp = RiskManager.calculate_position(
+                        signal, df, balance=1000, zone=zone, confidence=ml_conf or 1.0
+                    )
+
+
 
                     # Apply zone-based SL/TP tuning
                     if zone in zone_sl_tp_multipliers:
