@@ -235,19 +235,19 @@ def handle_journal():
                 try:
                     dt = datetime.datetime.fromisoformat(log["timestamp"])
                     if dt.strftime("%Y-%m-%d") == today:
-                        pnl = log.get("pnl", 0)
-                        result = "✅ TP" if pnl >= 0 else "❌ SL"
-                        msg += f"{result} | {strategy} | {pnl:+.2f} USDT\n"
-                        filtered_logs.append({
-                            "timestamp": log["timestamp"],
-                            "strategy": strategy,
-                            "pnl": pnl,
-                            "side": log.get("side", ""),
-                            "entry": log.get("entry", ""),
-                            "exit": log.get("exit", ""),
-                        })
+                        log["strategy"] = strategy
+                        filtered_logs.append(log)
                 except Exception:
                     continue
+
+        # ✅ Sort all logs chronologically before printing
+        filtered_logs.sort(key=lambda x: x["timestamp"])
+        for log in filtered_logs:
+            pnl = log.get("pnl", 0)
+            strategy = log.get("strategy", "Unknown")
+            result = "✅ TP" if pnl >= 0 else "❌ SL"
+            msg += f"{result} | {strategy} | {pnl:+.2f} USDT\n"
+
 
         if not filtered_logs:
             msg += "No trades today."
