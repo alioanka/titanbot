@@ -157,8 +157,12 @@ def run_bot():
                     ml_conf = getattr(engine, "last_ml_confidence", None)
                     zone = getattr(engine, "last_market_zone", None)
 
+                    # Ensure defaults are set if missing
+                    conf_for_risk = ml_conf if ml_conf is not None else 1.0
+                    zone_for_risk = zone if zone is not None else None
+
                     qty, leverage, sl, tp = RiskManager.calculate_position(
-                        signal, df, balance=1000, zone=zone, confidence=ml_conf or 1.0
+                        signal, df, balance=1000, zone=zone_for_risk, confidence=conf_for_risk
                     )
 
 
