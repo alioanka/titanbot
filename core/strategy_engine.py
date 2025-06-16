@@ -18,6 +18,9 @@ class StrategyEngine:
         self.data = data
         self.ml_predictor = PredictMarketDirection()
         self.strategies = self._load_strategies()  # ✅ Add this line
+        self.last_ml_confidence = None
+        self.last_market_zone = None
+
 
     def _load_strategies(self):
         strategies = []
@@ -38,6 +41,8 @@ class StrategyEngine:
 
         if confidence >= 0.75 and ml_signal in ["LONG", "SHORT"]:
             print(f"[🧠] ML signal selected: {ml_signal}")
+            self.last_ml_confidence = confidence  # ✅ Phase 14 support
+            self.last_market_zone = None          # Optional default
             return ml_signal
 
         # Step 2: Use Phase 12 ML strategy selector if available
@@ -76,8 +81,10 @@ class StrategyEngine:
                 elif trend < -0.015:
                     zone = "Bearish"
                 print(f"[🌐] Market zone: {zone}")
+                self.last_market_zone = zone  # ✅ Phase 14 support
             except Exception as e:
                 print(f"[⚠️] Trend zone detection failed: {e}")
+                self.last_market_zone = None
 
             # Load Phase 12 ML model
             from ml.selector_predictor import StrategySelector
