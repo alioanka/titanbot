@@ -41,8 +41,21 @@ class StrategyEngine:
 
         if confidence >= 0.75 and ml_signal in ["LONG", "SHORT"]:
             print(f"[🧠] ML signal selected: {ml_signal}")
-            self.last_ml_confidence = confidence  # ✅ Phase 14 support
-            self.last_market_zone = None          # Optional default
+            self.last_ml_confidence = confidence
+            # Set market zone here
+            try:
+                trend = (self.data["close"].iloc[-1] - self.data["close"].iloc[-20]) / self.data["close"].iloc[-20]
+                if trend > 0.015:
+                    self.last_market_zone = "Bullish"
+                elif trend < -0.015:
+                    self.last_market_zone = "Bearish"
+                else:
+                    self.last_market_zone = "Sideways"
+                print(f"[🌐] Market zone (ML path): {self.last_market_zone}")
+            except Exception as e:
+                print(f"[⚠️] ML zone detection failed: {e}")
+                self.last_market_zone = "Unknown"
+            
             return ml_signal
 
         # Step 2: Use Phase 12 ML strategy selector if available
@@ -130,6 +143,12 @@ class StrategyEngine:
             if best_strategy:
                 signal = best_strategy.generate_signal()
                 print(f"[🤖] Selector picked: {best_strategy.name()} → Signal: {signal} (Prob: {prob:.2f})")
+                self.last_ml_confidence = self.last_ml_confidence if hasattr(self, 'last_ml_confidence') else None
+                self.last_market_zone = self.last_market_zone if hasattr(self, 'last_market_zone') else "Unknown"
+                print(f"[PHASE 14 DEBUG] Final strategy signal: {signal}")
+                print(f"[PHASE 14 DEBUG] Last ML confidence set to: {self.last_ml_confidence}")
+                print(f"[PHASE 14 DEBUG] Last market zone set to: {self.last_market_zone}")
+             
                 return signal
         except Exception as e:
             print(f"[⚠️] Phase 12/13 strategy selector failed: {e}")
@@ -139,9 +158,19 @@ class StrategyEngine:
         if best_strategy:
             signal = best_strategy.generate_signal()
             print(f"↪️ {best_strategy.name()} → Signal: {signal}")
+            self.last_ml_confidence = self.last_ml_confidence if hasattr(self, 'last_ml_confidence') else None
+            self.last_market_zone = self.last_market_zone if hasattr(self, 'last_market_zone') else "Unknown"
+            print(f"[PHASE 14 DEBUG] Final strategy signal: {signal}")
+            print(f"[PHASE 14 DEBUG] Last ML confidence set to: {self.last_ml_confidence}")
+            print(f"[PHASE 14 DEBUG] Last market zone set to: {self.last_market_zone}")
+                
             return signal
         else:
             return "HOLD"
+        
+        print(f"[PHASE 14 DEBUG] Final strategy signal: {signal}")
+        print(f"[PHASE 14 DEBUG] Last ML confidence set to: {self.last_ml_confidence}")
+        print(f"[PHASE 14 DEBUG] Last market zone set to: {self.last_market_zone}")
 
 
 
