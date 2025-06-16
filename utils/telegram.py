@@ -210,14 +210,28 @@ def handle_journal():
     import pandas as pd
 
     try:
-        all_logs = load_strategy_logs()  # Load all strategy logs
+        raw_data = load_strategy_logs()
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         filtered_logs = []
 
         msg = f"📔 <b>Trade Journal ({today})</b>\n\n"
 
-        for strategy, data in all_logs.items():
-            for log in data.get("logs", []):
+        # ✅ Handle both list and dict structures
+        if isinstance(raw_data, dict):
+            strategy_logs = raw_data.items()
+        elif isinstance(raw_data, list):
+            # Normalize to: {strategy: [logs]} format
+            from collections import defaultdict
+            strategy_dict = defaultdict(list)
+            for log in raw_data:
+                strategy = log.get("strategy", "Unknown")
+                strategy_dict[strategy].append(log)
+            strategy_logs = strategy_dict.items()
+        else:
+            raise ValueError("Unsupported format from load_strategy_logs")
+
+        for strategy, logs in strategy_logs:
+            for log in logs:
                 try:
                     dt = datetime.datetime.fromisoformat(log["timestamp"])
                     if dt.strftime("%Y-%m-%d") == today:
@@ -247,6 +261,7 @@ def handle_journal():
 
     except Exception as e:
         send_telegram(f"⚠️ Error in journal: {str(e)}")
+
 
 
 def handle_monthly():
