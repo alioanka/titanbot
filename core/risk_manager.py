@@ -21,8 +21,9 @@ class RiskManager:
         sl_mult = RiskManager.SL_ATR_MULTIPLIER
         tp_mult = RiskManager.TP_ATR_MULTIPLIER
 
-        # 🔁 Adjust based on zone if available (Phase 13)
+        # 📉 Adjust based on zone if available (Phase 13)
         if zone:
+            print(f"[🌍] Adjusting SL/TP for market zone: {zone}")
             if zone == "Bullish":
                 sl_mult *= 0.9
                 tp_mult *= 1.2
@@ -32,11 +33,21 @@ class RiskManager:
             elif zone == "Sideways":
                 sl_mult *= 0.8
                 tp_mult *= 0.8
+            print(f"[⚙️] Zone-based multipliers applied: SL x{sl_mult:.2f}, TP x{tp_mult:.2f}")
 
-        # 📉 Adjust further if ML confidence is weak
-        if confidence < 0.8:
-            sl_mult *= 0.9
-            tp_mult *= 0.9
+        # 📐 Adjust further if ML confidence is weak (Phase 14)
+        if confidence < 0.99:
+            if confidence >= 0.95:
+                sl_mult *= 0.9
+                tp_mult *= 0.9
+            elif confidence >= 0.90:
+                sl_mult *= 0.85
+                tp_mult *= 0.85
+            elif confidence >= 0.80:
+                sl_mult *= 0.75
+                tp_mult *= 0.75
+            print(f"[📐] Confidence-based multipliers applied: SL x{sl_mult:.2f}, TP x{tp_mult:.2f} for conf {confidence:.2f}")
+
 
         if atr is None or np.isnan(atr):
             sl_pct = RiskManager.FALLBACK_SL_PCT

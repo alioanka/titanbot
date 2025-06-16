@@ -169,28 +169,7 @@ def run_bot():
                         signal, df, balance=1000, zone=zone_for_risk, confidence=conf_for_risk
                     )
                     # ✅ Final confirmation logging
-                    print(f"[✅] First Final SL/TP values after Phase 14 logic:")
-                    print(f"     ➤ Signal: {signal}")
-                    print(f"     ➤ ML Confidence: {ml_conf if ml_conf is not None else 'N/A'}")
-                    print(f"     ➤ Market Zone: {zone if zone is not None else 'N/A'}")
-                    print(f"     ➤ SL: {sl:.2f} | TP: {tp:.2f}")
 
-
-                    # Apply zone-based SL/TP tuning
-                    if zone in zone_sl_tp_multipliers:
-                        sl_mul, tp_mul = zone_sl_tp_multipliers[zone]
-                        sl *= sl_mul
-                        tp *= tp_mul
-                        print(f"[⚙️] Zone-based multipliers applied: SL x{sl_mul}, TP x{tp_mul}")
-
-                    # Apply confidence-based tuning
-                    if isinstance(ml_conf, float):
-                        for threshold, (sl_mul, tp_mul) in confidence_sl_tp_multipliers:
-                            if ml_conf >= threshold:
-                                sl *= sl_mul
-                                tp *= tp_mul
-                                print(f"[📐] Confidence-based multipliers applied: SL x{sl_mul}, TP x{tp_mul} for conf {ml_conf}")
-                                break
                     print(f"[✅] Final SL/TP values after Phase 14 logic:")
                     print(f"     ➤ Signal: {signal}")
                     print(f"     ➤ ML Confidence: {ml_conf if ml_conf is not None else 'N/A'}")
