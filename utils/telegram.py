@@ -205,28 +205,49 @@ def handle_weekly():
     send_telegram(msg)
 
 def handle_journal():
-    from core.strategy_rating import summarize, load_strategy_logs
-    stats = summarize(load_strategy_logs())
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    logs = []
-    msg = f"📔 <b>Trade Journal ({today})</b>\n\n"
-    for strategy, data in stats.items():
-        for log in data.get("logs", []):
-            try:
-                dt = datetime.datetime.fromisoformat(log["timestamp"])
-                if dt.strftime("%Y-%m-%d") == today:
-                    result = "✅ TP" if log["pnl"] >= 0 else "❌ SL"
-                    msg += f"{result} | {strategy} | {log['pnl']:+.2f} USDT\n"
-                    logs.append(log)
-            except:
-                continue
-    if not logs:
-        msg += "No trades today."
-    send_telegram(msg)
-    if logs:
-        df = pd.DataFrame(logs)
-        df.to_csv("journal.csv", index=False)
-        send_document("journal.csv", caption="📎 Today's Journal")
+    from core.strategy_rating import load_strategy_logs
+    import datetime
+    import pandas as pd
+
+    try:
+        all_logs = load_strategy_logs()  # Load all strategy logs
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        filtered_logs = []
+
+        msg = f"📔 <b>Trade Journal ({today})</b>\n\n"
+
+        for strategy, data in all_logs.items():
+            for log in data.get("logs", []):
+                try:
+                    dt = datetime.datetime.fromisoformat(log["timestamp"])
+                    if dt.strftime("%Y-%m-%d") == today:
+                        pnl = log.get("pnl", 0)
+                        result = "✅ TP" if pnl >= 0 else "❌ SL"
+                        msg += f"{result} | {strategy} | {pnl:+.2f} USDT\n"
+                        filtered_logs.append({
+                            "timestamp": log["timestamp"],
+                            "strategy": strategy,
+                            "pnl": pnl,
+                            "side": log.get("side", ""),
+                            "entry": log.get("entry", ""),
+                            "exit": log.get("exit", ""),
+                        })
+                except Exception:
+                    continue
+
+        if not filtered_logs:
+            msg += "No trades today."
+
+        send_telegram(msg)
+
+        if filtered_logs:
+            df = pd.DataFrame(filtered_logs)
+            df.to_csv("journal.csv", index=False)
+            send_document("journal.csv", caption="📎 Today's Journal")
+
+    except Exception as e:
+        send_telegram(f"⚠️ Error in journal: {str(e)}")
+
 
 def handle_monthly():
     from core.strategy_rating import load_strategy_logs
