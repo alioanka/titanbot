@@ -157,14 +157,23 @@ def run_bot():
                     ml_conf = getattr(engine, "last_ml_confidence", None)
                     zone = getattr(engine, "last_market_zone", None)
 
+                    # ✅ Log values to verify
+                    print(f"[DEBUG] Using ML Confidence: {ml_conf}")
+                    print(f"[DEBUG] Using Market Zone: {zone}")
+
                     # Ensure defaults are set if missing
                     conf_for_risk = ml_conf if ml_conf is not None else 1.0
-                    zone_for_risk = zone if zone is not None else None
+                    zone_for_risk = zone if zone is not None else "Unknown"
 
                     qty, leverage, sl, tp = RiskManager.calculate_position(
                         signal, df, balance=1000, zone=zone_for_risk, confidence=conf_for_risk
                     )
-
+                    # ✅ Final confirmation logging
+                    print(f"[✅] First Final SL/TP values after Phase 14 logic:")
+                    print(f"     ➤ Signal: {signal}")
+                    print(f"     ➤ ML Confidence: {ml_conf if ml_conf is not None else 'N/A'}")
+                    print(f"     ➤ Market Zone: {zone if zone is not None else 'N/A'}")
+                    print(f"     ➤ SL: {sl:.2f} | TP: {tp:.2f}")
 
 
                     # Apply zone-based SL/TP tuning
