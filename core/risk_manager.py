@@ -90,63 +90,39 @@ class RiskManager:
     
 
 
-def trailing_stop_check(client, symbol, config=TRAILING_STOP):
-    try:
-        if not config.get("enabled", False):
-            return
+def trailing_stop_check(client, symbol, position, entry_price, signal, sl_price, tp_price, trailing_config):
+    """
+    Checks if trailing stop should activate. If activation price is reached,
+    replaces existing SL with a dynamic trailing stop.
+    """
+    current_price = client.get_symbol_price(symbol)
+    if current_price is None:
+        return
 
-        pos = StateTracker.get_open_position(symbol)
-        if not pos:
-            print(f"[ℹ️] No live position to trail for {symbol}")
-            return
+    activation_pct = trailing_config["activation_pct"]
+    trail_pct = trailing_config["trail_pct"]
+    position_side = position["positionSide"] if "positionSide" in position else "BOTH"
 
-        qty = abs(float(pos["positionAmt"]))
-        entry = float(pos["entryPrice"])
-        side = pos["side"]
-        direction = 1 if side == "LONG" else -1
+    # Determine activation and trail prices
+    if signal == "LONG":
+        activation_price = entry_price * (1 + activation_pct)
+        if current_price >= activation_price:
+            new_sl = current_price * (1 - trail_pct)
+            if new_sl > sl_price:
+                # Modify SL to trailing version
+                client.cancel_open_orders(symbol)
+                client.set_stop_loss(symbol, new_sl, position_side=position_side)
+                print(f"[🚨 Trailing SL activated for LONG] SL moved to {new_sl:.2f} (Price: {current_price:.2f})")
 
-        activation_pct = config.get("activation_pct", 0.005)
-        trail_pct = config.get("trail_pct", 0.003)
+    elif signal == "SHORT":
+        activation_price = entry_price * (1 - activation_pct)
+        if current_price <= activation_price:
+            new_sl = current_price * (1 + trail_pct)
+            if new_sl < sl_price:
+                client.cancel_open_orders(symbol)
+                client.set_stop_loss(symbol, new_sl, position_side=position_side)
+                print(f"[🚨 Trailing SL activated for SHORT] SL moved to {new_sl:.2f} (Price: {current_price:.2f})")
 
-        activation_price = entry * (1 + direction * activation_pct)
-        new_sl = entry * (1 + direction * (activation_pct - trail_pct))
-
-        current_price = client.get_current_price(symbol)
-        if current_price is None:
-            print(f"[⚠️] Could not get current price for {symbol}")
-            return
-
-        if direction == 1 and current_price < activation_price:
-            print(f"[⏩] Trailing SL skipped: {symbol} profit not reached (LONG) — {current_price:.2f} < {activation_price:.2f}")
-            return
-        if direction == -1 and current_price > activation_price:
-            print(f"[⏩] Trailing SL skipped: {symbol} profit not reached (SHORT) — {current_price:.2f} > {activation_price:.2f}")
-            return
-
-        # Fetch open orders to verify
-        open_orders = client.get_open_orders(symbol)
-        existing_tp = any(o["type"] == "TAKE_PROFIT_MARKET" and o["reduceOnly"] for o in open_orders)
-        existing_sl = any(o["type"] == "STOP_MARKET" and o["reduceOnly"] for o in open_orders)
-
-        # Update missing SL
-        if not existing_sl:
-            client.set_stop_loss(symbol, "SELL" if side == "LONG" else "BUY", qty, new_sl)
-            send_telegram(f"🔄 <b>Trailing SL Repaired</b>\nSymbol: {symbol}\nNew SL: {new_sl:.2f}")
-            print(f"[🛡️] Repaired missing SL for {symbol} at {new_sl:.2f}")
-        else:
-            print(f"[✅] SL already in place for {symbol}")
-
-        # Update missing TP (keep a basic +0.2% gain if TP is somehow missing)
-        if not existing_tp:
-            tp_price = entry * (1 - direction * 0.002)
-            client.set_take_profit(symbol, side, qty, tp_price)
-            send_telegram(f"💰 <b>Trailing TP Repaired</b>\nSymbol: {symbol}\nNew TP: {tp_price:.2f}")
-            print(f"[💰] Repaired missing TP for {symbol} at {tp_price:.2f}")
-        else:
-            print(f"[✅] TP already in place for {symbol}")
-
-    except Exception as e:
-        print(f"[🔥] Trailing Stop Logic Exception: {e}")
 
 
 

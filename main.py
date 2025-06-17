@@ -138,6 +138,39 @@ def run_bot():
             # ✅ Place new order only if no position exists
             if current_position:
                 print("[⏳] Open position already exists, skipping new order.")
+
+                # ✅ Phase 15: Trailing Stop Check for open position
+                try:
+                    from core.risk_manager import trailing_stop_check
+
+                    # Extract required values from saved state
+                    previous_state = StateTracker.load_position_state()
+                    if previous_state:
+                        entry_price = float(previous_state.get("entry"))
+                        sl_price = float(previous_state.get("sl"))
+                        tp_price = float(previous_state.get("tp"))
+                        final_signal = previous_state.get("side")
+
+                        TRAILING_STOP = {
+                            "activation_pct": 0.005,
+                            "trail_pct": 0.003
+                        }
+
+                        trailing_stop_check(
+                            client=client,
+                            symbol=SYMBOL,
+                            position=current_position,
+                            entry_price=entry_price,
+                            signal=final_signal,
+                            sl_price=sl_price,
+                            tp_price=tp_price,
+                            trailing_config=TRAILING_STOP
+                        )
+
+                except Exception as e:
+                    print(f"[⚠️] Error in Trailing SL check: {e}")
+
+
             else:
                 #signal = "LONG"  # or engine.select_strategy_and_generate_signal()
                 signal = engine.select_strategy_and_generate_signal()
@@ -199,12 +232,6 @@ def run_bot():
                 emergency_exit(client)
                 send_telegram(f"🛑 <b>Emergency Exit Triggered</b>\nSymbol: {SYMBOL}\nReason: Max drawdown exceeded.")
 
-            # ✅ Phase 15: Trailing Stop Check
-            try:
-                from core.risk_manager import trailing_stop_check
-                trailing_stop_check(client, SYMBOL)
-            except Exception as e:
-                print(f"[⚠️] Error in Trailing Stop Logic: {e}")
 
         except Exception as e:
             print("[❌] Critical error in bot loop:")
