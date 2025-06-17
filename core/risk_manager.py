@@ -91,38 +91,78 @@ class RiskManager:
 
 
 def trailing_stop_check(client, symbol, position, entry_price, signal, sl_price, tp_price, trailing_config):
-    """
-    Checks if trailing stop should activate. If activation price is reached,
-    replaces existing SL with a dynamic trailing stop.
-    """
     current_price = client.get_current_price(symbol)
     if current_price is None:
+        print(f"[⚠️] Skipping trailing check — current price not available for {symbol}")
         return
 
     activation_pct = trailing_config["activation_pct"]
     trail_pct = trailing_config["trail_pct"]
-    position_side = position["positionSide"] if "positionSide" in position else "BOTH"
+    position_side = position.get("positionSide", "BOTH")
 
-    # Determine activation and trail prices
+    activation_price = None
+    new_sl = None
+
+    print(f"\n[🔍] Trailing SL Check for {symbol}")
+    print(f"     ➤ Signal: {signal}")
+    print(f"     ➤ Entry Price: {entry_price:.2f}")
+    print(f"     ➤ Current Price: {current_price:.2f}")
+    print(f"     ➤ TP: {tp_price:.2f} | SL: {sl_price:.2f}")
+    print(f"     ➤ Trailing Config → Activation: {activation_pct*100:.2f}%, Trail: {trail_pct*100:.2f}%")
+
     if signal == "LONG":
         activation_price = entry_price * (1 + activation_pct)
+        new_sl = current_price * (1 - trail_pct)
+
+        if activation_price > tp_price:
+            print(f"[⛔] Skipping trailing — activation ({activation_price:.2f}) > TP ({tp_price:.2f})")
+            return
+
+        print(f"     ➤ Activation Price (LONG): {activation_price:.2f} | New SL: {new_sl:.2f}")
+
         if current_price >= activation_price:
-            new_sl = current_price * (1 - trail_pct)
             if new_sl > sl_price:
-                # Modify SL to trailing version
-                client.cancel_open_orders(symbol)
-                client.set_stop_loss(symbol, new_sl, position_side=position_side)
-                print(f"[🚨 Trailing SL activated for LONG] SL moved to {new_sl:.2f} (Price: {current_price:.2f})")
+                print(f"[🚨] Triggering Trailing SL (LONG) — New SL: {new_sl:.2f} > Old SL: {sl_price:.2f}")
+                try:
+                    client.cancel_stop_loss_order(symbol)
+                    client.set_stop_loss(symbol, new_sl, position_side=position_side)
+                    send_telegram(
+                        f"📉 <b>Trailing SL Updated (LONG)</b>\n"
+                        f"Symbol: {symbol}\nNew SL: {new_sl:.2f}\nEntry: {entry_price:.2f}\nPrice: {current_price:.2f}"
+                    )
+                except Exception as e:
+                    print(f"[⚠️] Failed to update trailing SL: {e}")
+            else:
+                print(f"[ℹ️] Skipped update — New SL not better than current.")
+        else:
+            print(f"[🕒] Waiting — current price below activation ({activation_price:.2f})")
 
     elif signal == "SHORT":
         activation_price = entry_price * (1 - activation_pct)
+        new_sl = current_price * (1 + trail_pct)
+
+        if activation_price < tp_price:
+            print(f"[⛔] Skipping trailing — activation ({activation_price:.2f}) < TP ({tp_price:.2f})")
+            return
+
+        print(f"     ➤ Activation Price (SHORT): {activation_price:.2f} | New SL: {new_sl:.2f}")
+
         if current_price <= activation_price:
-            new_sl = current_price * (1 + trail_pct)
             if new_sl < sl_price:
-                client.cancel_open_orders(symbol)
-                client.set_stop_loss(symbol, new_sl, position_side=position_side)
-                print(f"[🚨 Trailing SL activated for SHORT] SL moved to {new_sl:.2f} (Price: {current_price:.2f})")
+                print(f"[🚨] Triggering Trailing SL (SHORT) — New SL: {new_sl:.2f} < Old SL: {sl_price:.2f}")
+                try:
+                    client.cancel_stop_loss_order(symbol)
+                    client.set_stop_loss(symbol, new_sl, position_side=position_side)
+                    send_telegram(
+                        f"📉 <b>Trailing SL Updated (SHORT)</b>\n"
+                        f"Symbol: {symbol}\nNew SL: {new_sl:.2f}\nEntry: {entry_price:.2f}\nPrice: {current_price:.2f}"
+                    )
+                except Exception as e:
+                    print(f"[⚠️] Failed to update trailing SL: {e}")
+            else:
+                print(f"[ℹ️] Skipped update — New SL not better than current.")
+        else:
+            print(f"[🕒] Waiting — current price above activation ({activation_price:.2f})")
 
-
-
-
+    else:
+        print(f"[⚠️] Unknown signal type: {signal}")
