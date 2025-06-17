@@ -138,10 +138,11 @@ class BinanceFuturesClient:
         """
         Fetch the current price for the given symbol from Binance Futures.
         """
-        url = f"{self.base_url}/fapi/v1/ticker/price?symbol={symbol}"
+        url = f"{BASE_URL}/fapi/v1/ticker/price?symbol={symbol}"
         response = self.session.get(url)
         response.raise_for_status()
         return float(response.json()["price"])
+
 
 
 
