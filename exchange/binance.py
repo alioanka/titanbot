@@ -262,6 +262,28 @@ class BinanceFuturesClient:
             from utils.telegram import send_telegram
             send_telegram(f"❌ <b>TP Order FAILED</b> for {symbol}\n<code>{tp_response.text}</code>")
 
+    def get_open_position(self, symbol):
+        try:
+            params = {"timestamp": int(time.time() * 1000)}
+            query = urlencode(params)
+            signature = hmac.new(BINANCE_API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+            url = f"{BASE_URL}/fapi/v2/positionRisk?{query}&signature={signature}"
+            res = self.session.get(url)
+            positions = res.json()
+            for pos in positions:
+                if pos["symbol"] == symbol and float(pos["positionAmt"]) != 0:
+                    return {
+                        "symbol": symbol,
+                        "positionAmt": float(pos["positionAmt"]),
+                        "entryPrice": float(pos["entryPrice"]),
+                        "unrealizedProfit": float(pos["unrealizedProfit"]),
+                        "side": "LONG" if float(pos["positionAmt"]) > 0 else "SHORT"
+                    }
+            return None
+        except Exception as e:
+            print(f"[⚠️] Error fetching open position for {symbol}: {e}")
+            return None
+
 
 
 
