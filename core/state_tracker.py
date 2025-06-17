@@ -9,7 +9,10 @@ import hmac, hashlib
 from urllib.parse import urlencode
 
 class StateTracker:
-    STATE_FILE = "position_state.json"
+#    STATE_FILE = "position_state.json"
+    @staticmethod
+    def _get_state_file(symbol):
+        return f"state_{symbol}.json"
 
     @staticmethod
     def _signed_request(path, params={}, method="GET"):
@@ -85,17 +88,25 @@ class StateTracker:
 
     @staticmethod
     def save_position_state(position_data):
-        with open(StateTracker.STATE_FILE, "w") as f:
+        symbol = position_data.get("symbol")
+        if not symbol:
+            return
+        with open(StateTracker._get_state_file(symbol), "w") as f:
             json.dump(position_data, f)
 
+
     @staticmethod
-    def load_position_state():
-        if os.path.exists(StateTracker.STATE_FILE):
-            with open(StateTracker.STATE_FILE, "r") as f:
+    def load_position_state(symbol):
+        path = StateTracker._get_state_file(symbol)
+        if os.path.exists(path):
+            with open(path, "r") as f:
                 return json.load(f)
         return None
 
+
     @staticmethod
-    def clear_state():
-        if os.path.exists(StateTracker.STATE_FILE):
-            os.remove(StateTracker.STATE_FILE)
+    def clear_state(symbol):
+        path = StateTracker._get_state_file(symbol)
+        if os.path.exists(path):
+            os.remove(path)
+

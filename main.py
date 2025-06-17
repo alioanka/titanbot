@@ -19,7 +19,7 @@ import threading
 MODEL_PATH = "ml/model_lightgbm.txt"
 RETRAIN_INTERVAL_HOURS = 24
 
-SYMBOL = "BTCUSDT"
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 TIMEFRAME = "15m"
 
 last_trade_close_time = 0
@@ -80,166 +80,134 @@ def auto_retrain_model(symbol="BTCUSDT", interval="5m"):
 #   signal = engine.select_strategy_and_generate_signal()
 
 def run_bot():
-    print("🚀 TitanBot AI starting...")
+    print("🚀 TitanBot AI starting (multi-symbol mode)...")
 
-    auto_retrain_model(symbol=SYMBOL, interval=TIMEFRAME)
     client = BinanceFuturesClient()
-    
+    SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 
     while True:
-        try:
-            df = client.get_klines(SYMBOL, TIMEFRAME)
-            engine = StrategyEngine(symbol=SYMBOL, timeframe=TIMEFRAME, data=df)
+        for symbol in SYMBOLS:
+            try:
+                df = client.get_klines(symbol, TIMEFRAME)
+                engine = StrategyEngine(symbol=symbol, timeframe=TIMEFRAME, data=df)
 
-            # ✅ LOAD previous position (to compare against current)
-            previous_state = StateTracker.load_position_state()
-            current_position = StateTracker.get_open_position(SYMBOL)
-            print("[DEBUG] Position info:", current_position)
+                # ✅ LOAD previous position (to compare against current)
+                previous_state = StateTracker.load_position_state(symbol)
+                current_position = StateTracker.get_open_position(symbol)
+                print(f"[DEBUG] Position info for {symbol}:", current_position)
 
-            # ✅ If previous existed and current is gone = trade closed
-            if previous_state and not current_position:
-                from core.performance_logger import log_strategy_result
-                # NEW: Cancel all open orders for this symbol
-                client.cancel_all_orders(SYMBOL)
+                # ✅ If previous existed and current is gone = trade closed
+                if previous_state and not current_position:
+                    from core.performance_logger import log_strategy_result
+                    client.cancel_all_orders(symbol)
 
-                # Get current price as exit reference
-                try:
-                    price_data = requests.get(f"{BASE_URL}/fapi/v1/ticker/price?symbol={SYMBOL}").json()
-                    current_price = float(price_data["price"])
-                except:
-                    current_price = None
+                    try:
+                        current_price = client.get_ticker(symbol)
+                    except:
+                        current_price = None
 
-                pnl = "Unknown"
-                try:
-                    entry = float(previous_state["entry"])
-                    size = float(previous_state["qty"])
-                    side = previous_state["side"]
+                    pnl = "Unknown"
+                    try:
+                        entry = float(previous_state["entry"])
+                        size = float(previous_state["qty"])
+                        side = previous_state["side"]
+                        if current_price:
+                            pnl = (current_price - entry) * size if side == "LONG" else (entry - current_price) * size
+                    except:
+                        pass
 
-                    if current_price:
-                        pnl = (current_price - entry) * size if side == "LONG" else (entry - current_price) * size
-                except:
-                    pass
-
-                # If PnL is negative, assume SL
-                result_type = "STOP LOSS" if pnl != "Unknown" and pnl < 0 else "TP or Manual"
-                global last_trade_close_time, last_trade_result
-                last_trade_close_time = time.time()
-                last_trade_result = "SL" if result_type == "STOP LOSS" else "TP"
-
-                send_telegram(f"✅ <b>Trade Closed ({result_type})</b>\nSymbol: {SYMBOL}")
-#                log_strategy_result(strategy_name="Unknown", result="TP_OR_CLOSE", pnl=round(pnl, 2))
-                log_strategy_result(
-                    strategy_name=previous_state.get("strategy", "Unknown"),
-                    result="TP_OR_CLOSE",
-                    pnl=round(pnl, 2)
-                )
-                StateTracker.clear_state()
-
-            # ✅ Place new order only if no position exists
-            if current_position:
-                print("[⏳] Open position already exists, skipping new order.")
-
-                # ✅ Phase 15: Trailing Stop Check for open position
-                try:
-                    from core.risk_manager import trailing_stop_check
-
-                    # Extract required values from saved state
-                    previous_state = StateTracker.load_position_state()
-                    if previous_state:
-                        entry_price = float(previous_state.get("entry"))
-                        sl_price = float(previous_state.get("sl"))
-                        tp_price = float(previous_state.get("tp"))
-                        final_signal = previous_state.get("side")
-
-                        TRAILING_STOP = {
-                            "activation_pct": 0.005,
-                            "trail_pct": 0.003
-                        }
-
-                        trailing_stop_check(
-                            client=client,
-                            symbol=SYMBOL,
-                            position=current_position,
-                            entry_price=entry_price,
-                            signal=final_signal,
-                            sl_price=sl_price,
-                            tp_price=tp_price,
-                            trailing_config=TRAILING_STOP
-                        )
-
-                except Exception as e:
-                    print(f"[⚠️] Error in Trailing SL check: {e}")
-
-
-            else:
-                #signal = "LONG"  # or engine.select_strategy_and_generate_signal()
-                signal = engine.select_strategy_and_generate_signal()
-
-
-                if last_trade_result == "TP" and (time.time() - last_trade_close_time) < cooldown_tp:
-                    print("⏳ TP cooldown active. Skipping entry.")
-                    continue
-
-                if last_trade_result == "SL" and (time.time() - last_trade_close_time) < cooldown_sl:
-                    print("⏳ SL cooldown active. Skipping entry.")
-                    continue
-
-
-                if signal in ["LONG", "SHORT"]:
-                    # 🧠 Get ML confidence and zone from engine (if available)
-                    ml_conf = getattr(engine, "last_ml_confidence", None)
-                    zone = getattr(engine, "last_market_zone", None)
-
-                    # ✅ Log values to verify
-                    print(f"[DEBUG] Using ML Confidence: {ml_conf}")
-                    print(f"[DEBUG] Using Market Zone: {zone}")
-
-                    # Ensure defaults are set if missing
-                    conf_for_risk = ml_conf if ml_conf is not None else 1.0
-                    zone_for_risk = zone if zone is not None else "Unknown"
-
-                    qty, leverage, sl, tp = RiskManager.calculate_position(
-                        signal, df, balance=1000, zone=zone_for_risk, confidence=conf_for_risk
+                    result_type = "STOP LOSS" if pnl != "Unknown" and pnl < 0 else "TP or Manual"
+                    send_telegram(f"✅ <b>Trade Closed ({result_type})</b>\nSymbol: {symbol}")
+                    log_strategy_result(
+                        strategy_name=previous_state.get("strategy", "Unknown"),
+                        result="TP_OR_CLOSE",
+                        pnl=round(pnl, 2)
                     )
-                    # ✅ Final confirmation logging
+                    StateTracker.clear_state(symbol)
 
-                    print(f"[✅] Final SL/TP values after Phase 14 logic:")
-                    print(f"     ➤ Signal: {signal}")
-                    print(f"     ➤ ML Confidence: {ml_conf if ml_conf is not None else 'N/A'}")
-                    print(f"     ➤ Market Zone: {zone if zone is not None else 'N/A'}")
-                    print(f"     ➤ SL: {sl:.2f} | TP: {tp:.2f}")
+                # ✅ Skip new trade if position exists
+                if current_position:
+                    print(f"[⏳] Open position exists for {symbol}, skipping new entry.")
 
+                    # ✅ Trailing SL logic (optional — Phase 15 paused logic can be restored later)
+                    try:
+                        from core.risk_manager import trailing_stop_check
+                        if previous_state:
+                            entry_price = float(previous_state.get("entry"))
+                            sl_price = float(previous_state.get("sl"))
+                            tp_price = float(previous_state.get("tp"))
+                            final_signal = previous_state.get("side")
 
+                            TRAILING_STOP = {
+                                "activation_pct": 0.005,
+                                "trail_pct": 0.003
+                            }
 
+                            trailing_stop_check(
+                                client=client,
+                                symbol=symbol,
+                                position=current_position,
+                                entry_price=entry_price,
+                                signal=final_signal,
+                                sl_price=sl_price,
+                                tp_price=tp_price,
+                                trailing_config=TRAILING_STOP
+                            )
+                    except Exception as e:
+                        print(f"[⚠️] Error in Trailing SL check for {symbol}: {e}")
+                    continue  # Skip placing a new order
 
-                    client.place_order(SYMBOL, signal, qty, sl, tp, leverage)
-                    StateTracker.save_position_state({
-                        "symbol": SYMBOL,
-                        "side": signal,
-                        "qty": qty,
-                        "sl": sl,
-                        "tp": tp,
-                        "leverage": leverage,
-                        "entry": df["close"].iloc[-1],  # or use live entry price
-                        "strategy": engine._select_best_strategy().name()  # ✅ add this line
-                    })
-                    send_telegram(f"🚀 <b>New {signal} Position Opened</b>\n"
-                                  f"Symbol: {SYMBOL}\nQty: {qty:.4f} @ Leverage {leverage}x\n"
-                                  f"SL: {sl:.2f} | TP: {tp:.2f}")
+                # ✅ Cooldowns (optional per-symbol tracking if desired)
+                signal = engine.select_strategy_and_generate_signal()
+                if signal not in ["LONG", "SHORT"]:
+                    continue
 
-            # ✅ Emergency SL kill switch
-            if StateTracker.detect_unusual_drawdown(symbol=SYMBOL, max_loss_pct=0.03):
-                emergency_exit(client)
-                send_telegram(f"🛑 <b>Emergency Exit Triggered</b>\nSymbol: {SYMBOL}\nReason: Max drawdown exceeded.")
+                ml_conf = getattr(engine, "last_ml_confidence", None)
+                zone = getattr(engine, "last_market_zone", None)
 
+                print(f"[DEBUG] {symbol} → ML Confidence: {ml_conf}, Zone: {zone}")
 
-        except Exception as e:
-            print("[❌] Critical error in bot loop:")
-            traceback.print_exc()
-            send_telegram(f"❌ <b>Error in TitanBot</b>\n{str(e)}")
+                conf_for_risk = ml_conf if ml_conf is not None else 1.0
+                zone_for_risk = zone if zone is not None else "Unknown"
+
+                qty, leverage, sl, tp = RiskManager.calculate_position(
+                    signal, df, balance=1000, zone=zone_for_risk, confidence=conf_for_risk
+                )
+
+                print(f"[✅] Final SL/TP values for {symbol}:")
+                print(f"     ➤ Signal: {signal}")
+                print(f"     ➤ SL: {sl:.2f} | TP: {tp:.2f}")
+
+                client.place_order(symbol, signal, qty, sl, tp, leverage)
+
+                StateTracker.save_position_state({
+                    "symbol": symbol,
+                    "side": signal,
+                    "qty": qty,
+                    "sl": sl,
+                    "tp": tp,
+                    "leverage": leverage,
+                    "entry": df["close"].iloc[-1],
+                    "strategy": engine._select_best_strategy().name()
+                })
+
+                send_telegram(f"🚀 <b>New {signal} Position Opened</b>\n"
+                              f"Symbol: {symbol}\nQty: {qty:.4f} @ Leverage {leverage}x\n"
+                              f"SL: {sl:.2f} | TP: {tp:.2f}")
+
+                # ✅ Emergency kill-switch
+                if StateTracker.detect_unusual_drawdown(symbol=symbol, max_loss_pct=0.03):
+                    emergency_exit(client)
+                    send_telegram(f"🛑 <b>Emergency Exit Triggered</b>\nSymbol: {symbol}")
+
+            except Exception as e:
+                print(f"[❌] Critical error in symbol loop ({symbol}):")
+                traceback.print_exc()
+                send_telegram(f"❌ <b>Error in TitanBot</b>\nSymbol: {symbol}\n{str(e)}")
 
         print("[⏳] Sleeping for 60 seconds...\n")
         time.sleep(60)
+
 
 def refresh_chart_every_12h():
     import subprocess
@@ -256,6 +224,6 @@ if __name__ == "__main__":
 
     # Start background threads BEFORE the bot loop
     threading.Thread(target=poll_telegram, daemon=True).start()
-    threading.Thread(target=auto_retrain_loop, args=(SYMBOL, TIMEFRAME), daemon=True).start()
+    threading.Thread(target=auto_retrain_loop, args=("BTCUSDT", TIMEFRAME), daemon=True).start()  # Optional default
     threading.Thread(target=refresh_chart_every_12h, daemon=True).start()
     run_bot()
