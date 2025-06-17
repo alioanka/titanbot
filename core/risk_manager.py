@@ -95,7 +95,7 @@ def trailing_stop_check(client, symbol, position, entry_price, signal, sl_price,
     Checks if trailing stop should activate. If activation price is reached,
     replaces existing SL with a dynamic trailing stop.
     """
-    current_price = client.get_symbol_price(symbol)
+    current_price = client.get_current_price(symbol)
     if current_price is None:
         return
 
