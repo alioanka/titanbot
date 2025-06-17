@@ -128,6 +128,7 @@ def trailing_stop_check(client, symbol, config=TRAILING_STOP):
         existing_tp = any(o["type"] == "TAKE_PROFIT_MARKET" and o["reduceOnly"] for o in open_orders)
         existing_sl = any(o["type"] == "STOP_MARKET" and o["reduceOnly"] for o in open_orders)
 
+        # Update missing SL
         if not existing_sl:
             client.set_stop_loss(symbol, "SELL" if side == "LONG" else "BUY", qty, new_sl)
             send_telegram(f"🔄 <b>Trailing SL Repaired</b>\nSymbol: {symbol}\nNew SL: {new_sl:.2f}")
@@ -135,8 +136,8 @@ def trailing_stop_check(client, symbol, config=TRAILING_STOP):
         else:
             print(f"[✅] SL already in place for {symbol}")
 
+        # Update missing TP (keep a basic +0.2% gain if TP is somehow missing)
         if not existing_tp:
-            # TP: small profit to close if missing
             tp_price = entry * (1 - direction * 0.002)
             client.set_take_profit(symbol, side, qty, tp_price)
             send_telegram(f"💰 <b>Trailing TP Repaired</b>\nSymbol: {symbol}\nNew TP: {tp_price:.2f}")
