@@ -111,7 +111,7 @@ def trailing_stop_check(client, symbol, config=TRAILING_STOP):
         activation_price = entry * (1 + direction * activation_pct)
         new_sl = entry * (1 + direction * (activation_pct - trail_pct))
 
-        current_price = client.get_price(symbol)
+        current_price = client.get_current_price(symbol)
         if current_price is None:
             print(f"[⚠️] Could not get current price for {symbol}")
             return
