@@ -103,7 +103,11 @@ def trailing_stop_check(client, symbol, position):
 
         entry_price = float(position["entryPrice"])
         side = "LONG" if float(position["positionAmt"]) > 0 else "SHORT"
-        current_price = float(client.get_current_price(symbol))
+        try:
+            current_price = float(client.get_current_price(symbol))
+        except Exception as e:
+            print(f"[⚠️] Failed to fetch current price: {e}")
+            return
 
             # Get current SL and TP from state if tracked
         from core.state_tracker import StateTracker

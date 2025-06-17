@@ -133,6 +133,16 @@ class BinanceFuturesClient:
         except Exception as e:
             print(f"[⚠️] Failed to fetch ticker for {symbol}: {e}")
             return 0.0
+        
+    def get_current_price(self, symbol: str) -> float:
+        """
+        Fetch the current price for the given symbol from Binance Futures.
+        """
+        url = f"{self.base_url}/fapi/v1/ticker/price?symbol={symbol}"
+        response = self.session.get(url)
+        response.raise_for_status()
+        return float(response.json()["price"])
+
 
 
 
