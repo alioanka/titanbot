@@ -276,7 +276,8 @@ class BinanceFuturesClient:
                         "symbol": symbol,
                         "positionAmt": float(pos["positionAmt"]),
                         "entryPrice": float(pos["entryPrice"]),
-                        "unrealizedProfit": float(pos["unrealizedProfit"]),
+                        "unrealizedProfit": float(pos.get("unrealizedProfit", 0.0)),
+
                         "side": "LONG" if float(pos["positionAmt"]) > 0 else "SHORT"
                     }
             return None

@@ -83,7 +83,7 @@ def run_bot():
     print("🚀 TitanBot AI starting (multi-symbol mode)...")
 
     client = BinanceFuturesClient()
-    SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
 
     while True:
         for symbol in SYMBOLS:
