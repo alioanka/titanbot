@@ -176,6 +176,29 @@ class BinanceFuturesClient:
                 if o.get("type") == "TAKE_PROFIT_MARKET" and o.get("closePosition"):
                     tp_found = True
         return sl_found, tp_found
+    
+    def safe_place_order(self, symbol, signal, qty, sl, tp, leverage):
+        self.cancel_all_orders(symbol)  # Just in case
+        self.place_order(symbol, signal, qty, sl, tp, leverage)
+
+        # Wait briefly to ensure Binance processes orders
+        time.sleep(2)
+
+        sl_ok, tp_ok = self.verify_open_orders(symbol)
+        if not sl_ok or not tp_ok:
+            print(f"[⚠️] SL or TP order missing for {symbol}, retrying once...")
+            print(f"[DEBUG] Missing SL: {not sl_ok}, Missing TP: {not tp_ok}")
+
+            self.place_order(symbol, signal, qty, sl, tp, leverage)
+            time.sleep(2)
+            sl_ok, tp_ok = self.verify_open_orders(symbol)
+
+            if not sl_ok or not tp_ok:
+                from utils.telegram import send_telegram
+                send_telegram(f"❌ <b>Failed to verify SL/TP</b> for {symbol} after retry. Manual check recommended.")
+            else:
+                print(f"[✅] SL/TP verified after retry for {symbol}")
+
 
 
 

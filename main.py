@@ -183,10 +183,7 @@ def run_bot():
                 # 🧹 Cleanup before placing a new order (in case old ones lingered)
                 client.cancel_all_orders(symbol)
 
-                client.place_order(symbol, signal, qty, sl, tp, leverage)
-                sl_ok, tp_ok = client.verify_open_orders(symbol)
-                if not sl_ok or not tp_ok:
-                    send_telegram(f"⚠️ <b>Warning:</b> SL or TP may be missing for {symbol}. Please verify manually.")
+                client.safe_place_order(symbol, signal, qty, sl, tp, leverage)
 
                 StateTracker.save_position_state({
                     "symbol": symbol,
