@@ -57,8 +57,23 @@ class RiskManager:
             print(f"[⚠️] Invalid ATR ({atr}). Using fallback SL/TP percentages.")
             sl_pct = RiskManager.FALLBACK_SL_PCT
             tp_pct = RiskManager.FALLBACK_TP_PCT
-            sl_price = close_price * (1 - sl_pct) if signal == "LONG" else close_price * (1 + sl_pct)
-            tp_price = close_price * (1 + tp_pct) if signal == "LONG" else close_price * (1 - tp_pct)
+
+            if signal == "LONG":
+                sl_price = close_price * (1 - sl_pct)
+                tp_price = close_price * (1 + tp_pct)
+            elif signal == "SHORT":
+                sl_price = close_price * (1 + sl_pct)
+                tp_price = close_price * (1 - tp_pct)
+            else:
+                print(f"[❌] Unknown signal type: {signal}")
+                return 0, 1, close_price, close_price
+
+            # 🔒 Ensure SL and TP are not equal to close (which causes zero distance)
+            if abs(close_price - sl_price) < 0.00001:
+                sl_price += 1 if signal == "LONG" else -1
+            if abs(close_price - tp_price) < 0.00001:
+                tp_price += 1 if signal == "LONG" else -1
+
         else:
             sl_price = close_price - atr * sl_mult if signal == "LONG" else close_price + atr * sl_mult
             tp_price = close_price + atr * tp_mult if signal == "LONG" else close_price - atr * tp_mult
@@ -68,11 +83,29 @@ class RiskManager:
         if stop_loss_distance == 0:
             print(f"[❌] SL distance is zero! Possible bug. SL = {sl_price}, Close = {close_price}, ATR = {atr}, SL Mult = {sl_mult}")
             print("[⚠️] Using fallback SL/TP values...")
+
+            # Redo with fallback values, same as above block
             sl_pct = RiskManager.FALLBACK_SL_PCT
             tp_pct = RiskManager.FALLBACK_TP_PCT
-            sl_price = close_price * (1 - sl_pct) if signal == "LONG" else close_price * (1 + sl_pct)
-            tp_price = close_price * (1 + tp_pct) if signal == "LONG" else close_price * (1 - tp_pct)
+
+            if signal == "LONG":
+                sl_price = close_price * (1 - sl_pct)
+                tp_price = close_price * (1 + tp_pct)
+            elif signal == "SHORT":
+                sl_price = close_price * (1 + sl_pct)
+                tp_price = close_price * (1 - tp_pct)
+            else:
+                print(f"[❌] Unknown signal type: {signal}")
+                return 0, 1, close_price, close_price
+
+            # 🔒 Safety net again
+            if abs(close_price - sl_price) < 0.00001:
+                sl_price += 1 if signal == "LONG" else -1
+            if abs(close_price - tp_price) < 0.00001:
+                tp_price += 1 if signal == "LONG" else -1
+
             stop_loss_distance = abs(close_price - sl_price)
+
 
         risk_amount = balance * RiskManager.MAX_RISK_PCT
         qty = risk_amount / stop_loss_distance
