@@ -19,7 +19,7 @@ import threading
 MODEL_PATH = "ml/model_lightgbm.txt"
 RETRAIN_INTERVAL_HOURS = 24
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 TIMEFRAME = "15m"
 
 last_trade_close_time = 0
@@ -83,7 +83,7 @@ def run_bot():
     print("🚀 TitanBot AI starting (multi-symbol mode)...")
 
     client = BinanceFuturesClient()
-    SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+    SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 
     while True:
         for symbol in SYMBOLS:
