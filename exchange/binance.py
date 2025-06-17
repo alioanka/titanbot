@@ -186,7 +186,12 @@ class BinanceFuturesClient:
 
         # 2. Wait and verify position
         time.sleep(2)
-        position = self.get_open_position(symbol)
+        # Retry getting the position (to handle Binance delay)
+        for _ in range(3):
+            time.sleep(2)
+            position = self.get_open_position(symbol)
+            if position:
+                break
         if not position:
             print(f"[❌] Market order failed for {symbol}. No position found.")
             from utils.telegram import send_telegram
@@ -277,13 +282,13 @@ class BinanceFuturesClient:
                         "positionAmt": float(pos["positionAmt"]),
                         "entryPrice": float(pos["entryPrice"]),
                         "unrealizedProfit": float(pos.get("unrealizedProfit", 0.0)),
-
                         "side": "LONG" if float(pos["positionAmt"]) > 0 else "SHORT"
                     }
             return None
         except Exception as e:
             print(f"[⚠️] Error fetching open position for {symbol}: {e}")
             return None
+
 
 
 
