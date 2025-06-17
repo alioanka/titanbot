@@ -34,9 +34,11 @@ class BinanceFuturesClient:
     def place_order(self, symbol, signal, quantity, sl_price, tp_price, leverage):
         side = "BUY" if signal == "LONG" else "SELL"
         position_side = "LONG" if signal == "LONG" else "SHORT"
+        sl_side = "SELL" if side == "BUY" else "BUY"
 
         self.set_leverage(symbol, leverage)
 
+        # 1. Place Market Order
         order_params = {
             "symbol": symbol,
             "side": side,
@@ -44,31 +46,42 @@ class BinanceFuturesClient:
             "quantity": self.round_step_size(symbol, quantity),
             "timestamp": int(time.time() * 1000)
         }
+        order_response = self._signed_post("/fapi/v1/order", order_params)
 
-        self._signed_post("/fapi/v1/order", order_params)
-
-        # Place SL
-        sl_side = "SELL" if side == "BUY" else "BUY"
+        # 2. Place SL
         sl_params = {
             "symbol": symbol,
             "side": sl_side,
             "type": "STOP_MARKET",
             "stopPrice": round(sl_price, 2),
             "closePosition": True,
+            "workingType": "MARK_PRICE",
             "timestamp": int(time.time() * 1000)
         }
-        self._signed_post("/fapi/v1/order", sl_params)
+        sl_response = self._signed_post("/fapi/v1/order", sl_params)
 
-        # Place TP
+        # 3. Place TP
         tp_params = {
             "symbol": symbol,
             "side": sl_side,
             "type": "TAKE_PROFIT_MARKET",
             "stopPrice": round(tp_price, 2),
             "closePosition": True,
+            "workingType": "MARK_PRICE",
             "timestamp": int(time.time() * 1000)
         }
-        self._signed_post("/fapi/v1/order", tp_params)
+        tp_response = self._signed_post("/fapi/v1/order", tp_params)
+
+        # 4. Log and Alert if SL or TP fails
+        if '"orderId"' not in sl_response.text:
+            print(f"[❌] SL order FAILED for {symbol}: {sl_response.text}")
+            from utils.telegram import send_telegram
+            send_telegram(f"❌ <b>SL Order FAILED</b> for {symbol}\n<code>{sl_response.text}</code>")
+
+        if '"orderId"' not in tp_response.text:
+            print(f"[❌] TP order FAILED for {symbol}: {tp_response.text}")
+            from utils.telegram import send_telegram
+            send_telegram(f"❌ <b>TP Order FAILED</b> for {symbol}\n<code>{tp_response.text}</code>")
 
         print(f"[🟢] Order placed: {side} {quantity} {symbol} @ market | SL: {sl_price}, TP: {tp_price}, Leverage: {leverage}")
 
@@ -142,6 +155,28 @@ class BinanceFuturesClient:
         response = self.session.get(url)
         response.raise_for_status()
         return float(response.json()["price"])
+    
+    def verify_open_orders(self, symbol):
+        url = f"{BASE_URL}/fapi/v1/openOrders"
+        params = {
+            "symbol": symbol,
+            "timestamp": int(time.time() * 1000)
+        }
+        query = urlencode(params)
+        signature = hmac.new(BINANCE_API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+        full_url = f"{url}?{query}&signature={signature}"
+        response = self.session.get(full_url)
+
+        sl_found, tp_found = False, False
+        if response.status_code == 200:
+            orders = response.json()
+            for o in orders:
+                if o.get("type") == "STOP_MARKET" and o.get("closePosition"):
+                    sl_found = True
+                if o.get("type") == "TAKE_PROFIT_MARKET" and o.get("closePosition"):
+                    tp_found = True
+        return sl_found, tp_found
+
 
 
 
