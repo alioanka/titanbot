@@ -19,7 +19,7 @@ import threading
 MODEL_PATH = "ml/model_lightgbm.txt"
 RETRAIN_INTERVAL_HOURS = 24
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
 TIMEFRAME = "15m"
 
 last_trade_close_time = 0
