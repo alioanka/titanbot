@@ -99,6 +99,7 @@ def run_bot():
                 # ✅ If previous existed and current is gone = trade closed
                 if previous_state and not current_position:
                     from core.performance_logger import log_strategy_result
+                    print(f"[🧹] No open position for {symbol}. Canceling all leftover orders...")
                     client.cancel_all_orders(symbol)
 
                     try:
@@ -124,6 +125,7 @@ def run_bot():
                         pnl=round(pnl, 2)
                     )
                     StateTracker.clear_state(symbol)
+                    continue  # ⛔ important: prevent new entry in same cycle
 
                 # ✅ Skip new trade if position exists
                 if current_position:
@@ -177,6 +179,9 @@ def run_bot():
                 print(f"[✅] Final SL/TP values for {symbol}:")
                 print(f"     ➤ Signal: {signal}")
                 print(f"     ➤ SL: {sl:.2f} | TP: {tp:.2f}")
+
+                # 🧹 Cleanup before placing a new order (in case old ones lingered)
+                client.cancel_all_orders(symbol)
 
                 client.place_order(symbol, signal, qty, sl, tp, leverage)
 
