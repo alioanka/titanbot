@@ -53,7 +53,8 @@ class RiskManager:
             print(f"[📐] Confidence-based multipliers applied: SL x{sl_mult:.2f}, TP x{tp_mult:.2f} for conf {confidence:.2f}")
 
 
-        if atr is None or np.isnan(atr):
+        if atr is None or np.isnan(atr) or atr == 0:
+            print(f"[⚠️] Invalid ATR ({atr}). Using fallback SL/TP percentages.")
             sl_pct = RiskManager.FALLBACK_SL_PCT
             tp_pct = RiskManager.FALLBACK_TP_PCT
             sl_price = close_price * (1 - sl_pct) if signal == "LONG" else close_price * (1 + sl_pct)
