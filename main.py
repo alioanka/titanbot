@@ -202,7 +202,7 @@ def run_bot():
             # ✅ Phase 15: Trailing Stop Check
             try:
                 from core.risk_manager import trailing_stop_check
-                trailing_stop_check(client, SYMBOL, current_position)
+                trailing_stop_check(client, SYMBOL)
             except Exception as e:
                 print(f"[⚠️] Error in Trailing Stop Logic: {e}")
 
