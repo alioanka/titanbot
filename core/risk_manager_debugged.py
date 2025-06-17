@@ -63,22 +63,9 @@ class RiskManager:
             tp_price = close_price + atr * tp_mult if signal == "LONG" else close_price - atr * tp_mult
 
         stop_loss_distance = abs(close_price - sl_price)
-
-        if stop_loss_distance == 0:
-            print(f"[❌] SL distance is zero! Possible bug. SL = {sl_price}, Close = {close_price}, ATR = {atr}, SL Mult = {sl_mult}")
-            print("[⚠️] Using fallback SL/TP values...")
-            sl_pct = RiskManager.FALLBACK_SL_PCT
-            tp_pct = RiskManager.FALLBACK_TP_PCT
-            sl_price = close_price * (1 - sl_pct) if signal == "LONG" else close_price * (1 + sl_pct)
-            tp_price = close_price * (1 + tp_pct) if signal == "LONG" else close_price * (1 - tp_pct)
-            stop_loss_distance = abs(close_price - sl_price)
-
         risk_amount = balance * RiskManager.MAX_RISK_PCT
+        print(f"[⚠️ DEBUG] close_price: {close_price}, sl_price: {sl_price}, stop_loss_distance: {stop_loss_distance}")
         qty = risk_amount / stop_loss_distance
-
-        if not np.isfinite(qty) or qty == 0:
-            print(f"[❌] Invalid qty calculated: {qty}. Skipping this trade.")
-            return 0, 1, sl_price, tp_price
 
         # ⚙️ Leverage adjustment based on volatility
         volatility = df["close"].pct_change().rolling(10).std().iloc[-1]
