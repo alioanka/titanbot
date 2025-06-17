@@ -89,73 +89,75 @@ class RiskManager:
     
 
 
-    def trailing_stop_check(client, symbol, position):
-        if not TRAILING_STOP.get("enabled", False):
-            return
+def trailing_stop_check(client, symbol, position):
+    if not TRAILING_STOP.get("enabled", False):
+        return
 
-        activation_pct = TRAILING_STOP.get("activation_pct", 0.005)
-        trail_pct = TRAILING_STOP.get("trail_pct", 0.003)
+    activation_pct = TRAILING_STOP.get("activation_pct", 0.005)
+    trail_pct = TRAILING_STOP.get("trail_pct", 0.003)
 
-        try:
-            qty = abs(float(position["positionAmt"]))
-            if qty == 0:
+    try:
+        qty = abs(float(position["positionAmt"]))
+        if qty == 0:
                 return
 
-            entry_price = float(position["entryPrice"])
-            side = "LONG" if float(position["positionAmt"]) > 0 else "SHORT"
-            current_price = float(client.get_current_price(symbol))
+        entry_price = float(position["entryPrice"])
+        side = "LONG" if float(position["positionAmt"]) > 0 else "SHORT"
+        current_price = float(client.get_current_price(symbol))
 
             # Get current SL and TP from state if tracked
-            from core.state_tracker import StateTracker
-            state = StateTracker.load_position_state()
-            if not state:
+        from core.state_tracker import StateTracker
+        state = StateTracker.load_position_state()
+        if not state:
+            return
+
+        existing_tp = state.get("tp")
+        if not existing_tp:
+            return
+
+        # Calculate if trailing should activate
+        if side == "LONG":
+            profit_trigger = entry_price * (1 + activation_pct)
+            if current_price < profit_trigger:
+                print(f"[⏩] Trailing SL skipped: {symbol} profit not reached (LONG) — {current_price:.2f} < {profit_trigger:.2f}")
                 return
-
-            existing_tp = state.get("tp")
-            if not existing_tp:
+            new_sl = current_price * (1 - trail_pct)
+        else:
+            profit_trigger = entry_price * (1 - activation_pct)
+            if current_price > profit_trigger:
+                print(f"[⏩] Trailing SL skipped: {symbol} profit not reached (SHORT) — {current_price:.2f} > {profit_trigger:.2f}")
                 return
+            new_sl = current_price * (1 + trail_pct)
 
-            # Calculate if trailing should activate
-            if side == "LONG":
-                profit_trigger = entry_price * (1 + activation_pct)
-                if current_price < profit_trigger:
-                    print(f"[⏩] Trailing SL skipped: {symbol} profit not reached (LONG) — {current_price:.2f} < {profit_trigger:.2f}")
-                    return
-                new_sl = current_price * (1 - trail_pct)
-            else:
-                profit_trigger = entry_price * (1 - activation_pct)
-                if current_price > profit_trigger:
-                    print(f"[⏩] Trailing SL skipped: {symbol} profit not reached (SHORT) — {current_price:.2f} > {profit_trigger:.2f}")
-                    return
-                new_sl = current_price * (1 + trail_pct)
+        # Prevent SL from getting closer to entry (regression)
+        current_sl = float(state.get("sl", 0))
+        if (side == "LONG" and new_sl <= current_sl) or (side == "SHORT" and new_sl >= current_sl):
+            print(f"[⏩] Trailing SL skipped: SL would regress — Old: {current_sl:.2f}, New: {new_sl:.2f}")
+            return
 
-            # Prevent SL from getting closer to entry (regression)
-            current_sl = float(state.get("sl", 0))
-            if (side == "LONG" and new_sl <= current_sl) or (side == "SHORT" and new_sl >= current_sl):
-                print(f"[⏩] Trailing SL skipped: SL would regress — Old: {current_sl:.2f}, New: {new_sl:.2f}")
-                return
+        print(f"[🔁] Trailing SL triggered for {symbol} ({side})")
+        print(f"     ➤ Current Price: {current_price:.2f}")
+        print(f"     ➤ Entry Price: {entry_price:.2f}")
+        print(f"     ➤ Old SL: {current_sl:.2f} → New SL: {new_sl:.2f}")
+        print(f"     ➤ Re-setting TP to {existing_tp:.2f}")
 
-            print(f"[🔁] Trailing SL triggered for {symbol} ({side})")
-            print(f"     ➤ Current Price: {current_price:.2f}")
-            print(f"     ➤ Entry Price: {entry_price:.2f}")
-            print(f"     ➤ Old SL: {current_sl:.2f} → New SL: {new_sl:.2f}")
-            print(f"     ➤ Re-setting TP to {existing_tp:.2f}")
+        # Cancel all current orders for the symbol
+        client.cancel_all_orders(symbol)
 
-            # Cancel all current orders for the symbol
-            client.cancel_all_orders(symbol)
+        # Log repair notice
+        print(f"[🔁] Repairing missing SL/TP orders for active position on {symbol}")
 
-            # Log repair notice
-            print(f"[🔁] Repairing missing SL/TP orders for active position on {symbol}")
+        # Place new SL and TP (rebuild exit structure)
+        client.set_stop_loss(symbol, "SELL" if side == "LONG" else "BUY", qty, new_sl)
+        client.set_take_profit(symbol, "SELL" if side == "LONG" else "BUY", qty, existing_tp)
+        from utils.telegram import send_telegram
+        send_telegram(f"🔁 <b>SL/TP Repaired</b>\nSymbol: {symbol}\nNew SL: {new_sl:.2f}\nTP: {existing_tp:.2f}")
 
-            # Place new SL and TP (rebuild exit structure)
-            client.set_stop_loss(symbol, "SELL" if side == "LONG" else "BUY", qty, new_sl)
-            client.set_take_profit(symbol, "SELL" if side == "LONG" else "BUY", qty, existing_tp)
+        # Update state with new SL
+        state["sl"] = new_sl
+        StateTracker.save_position_state(state)
 
-            # Update state with new SL
-            state["sl"] = new_sl
-            StateTracker.save_position_state(state)
-
-        except Exception as e:
-            print("[⚠️] Trailing SL update error:", e)
+    except Exception as e:
+        print("[⚠️] Trailing SL update error:", e)
 
 
