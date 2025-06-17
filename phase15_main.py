@@ -194,17 +194,43 @@ def run_bot():
                                   f"Symbol: {SYMBOL}\nQty: {qty:.4f} @ Leverage {leverage}x\n"
                                   f"SL: {sl:.2f} | TP: {tp:.2f}")
 
-            # ✅ Emergency SL kill switch
+            
+            # ✅ Phase 15: Check for trailing stop activation
+            if TRAILING_STOP["enabled"] and current_position:
+                try:
+                    from core.risk_manager import check_trailing_stop_trigger
+                    from core.exchange import order_manager
+
+                    entry_price = float(current_position["entry"])
+                    side = current_position["side"]
+                    qty = float(current_position["qty"])
+                    current_price = float(df["close"].iloc[-1])
+
+                    new_sl = check_trailing_stop_trigger(current_position, current_price)
+                    if new_sl:
+                        print(f"[🔁] Trailing Stop Triggered → Updating SL to: {new_sl}")
+                        # Cancel TP order (if any)
+                        client.cancel_all_orders(SYMBOL)
+                        # Place new SL only
+                        client.place_order(
+                            symbol=SYMBOL,
+                            side="SELL" if side == "LONG" else "BUY",
+                            quantity=qty,
+                            stop_loss=new_sl,
+                            take_profit=None,
+                            leverage=current_position["leverage"],
+                            reduce_only=True,
+                            close_position=True
+                        )
+                        send_telegram(f"🔁 <b>Trailing SL Updated</b>
+New SL: {new_sl}")
+                except Exception as e:
+                    print("[⚠️] Trailing Stop Error:", e)
+    
+# ✅ Emergency SL kill switch
             if StateTracker.detect_unusual_drawdown(symbol=SYMBOL, max_loss_pct=0.03):
                 emergency_exit(client)
                 send_telegram(f"🛑 <b>Emergency Exit Triggered</b>\nSymbol: {SYMBOL}\nReason: Max drawdown exceeded.")
-
-            # ✅ Phase 15: Trailing Stop Check
-            try:
-                from core.risk_manager import trailing_stop_check
-                trailing_stop_check(client, SYMBOL, current_position)
-            except Exception as e:
-                print(f"[⚠️] Error in Trailing Stop Logic: {e}")
 
         except Exception as e:
             print("[❌] Critical error in bot loop:")

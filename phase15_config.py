@@ -9,8 +9,10 @@ BASE_URL = "https://testnet.binancefuture.com"
 TELEGRAM_BOT_TOKEN = "7502687086:AAE0yi66l9zj87wCWO5ZMfn18_5ZJo8SuKo"
 TELEGRAM_CHAT_ID = "462007586"
 
+
+# ✅ Phase 15: Trailing Stop Logic
 TRAILING_STOP = {
     "enabled": True,
-    "activation_pct": 0.005,  # +0.5% profit to activate trailing
-    "trail_pct": 0.003        # trails by 0.3%
+    "activation_pct": 0.5,  # activates TSL after +0.5% gain
+    "trail_pct": 0.3        # trails 0.3% below peak
 }
